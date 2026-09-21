@@ -885,6 +885,7 @@ private fun Modifier.toqueAccionesMapa(editable: Boolean, abrirAcciones: () -> U
                 val inicio = awaitFirstDown(requireUnconsumed = false)
                 val puntoInicial = inicio.position
                 var movido = false
+                var pulsacionSostenida = false
                 var levantado = false
                 while (!levantado) {
                     val evento = awaitPointerEvent(PointerEventPass.Initial)
@@ -893,8 +894,12 @@ private fun Modifier.toqueAccionesMapa(editable: Boolean, abrirAcciones: () -> U
                         movido ||
                             (cambio.position - puntoInicial).getDistance() >
                                 viewConfiguration.touchSlop
+                    pulsacionSostenida =
+                        pulsacionSostenida ||
+                            cambio.uptimeMillis - inicio.uptimeMillis >=
+                                viewConfiguration.longPressTimeoutMillis
                     levantado = !cambio.pressed
                 }
-                if (!movido) abrirAcciones()
+                if (!movido && !pulsacionSostenida) abrirAcciones()
             }
         }
