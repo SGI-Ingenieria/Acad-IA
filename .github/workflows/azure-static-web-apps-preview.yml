@@ -350,3 +350,5 @@ jobs:
             echo "Supabase no entrego una branch sana para este commit (motivo: \`$REASON\`)."
             echo 'No se desplego el frontend contra produccion.'
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::No se publico el preview de Azure porque la branch Supabase no esta disponible ($REASON)."
+          exit 1
