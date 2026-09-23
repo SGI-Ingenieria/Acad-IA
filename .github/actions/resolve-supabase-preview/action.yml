@@ -67,13 +67,9 @@ runs:
             return 1
           fi
 
-          if [[ "$target_source" == 'preview' ]] && \
-            ! curl --fail --silent --show-error --max-time 10 \
-              --header "apikey: $public_key" \
-              "$target_url/rest/v1/roles?select=clave&limit=1" > /dev/null; then
-            return 1
-          fi
-
+          # A public-key query against an application table is not a readiness
+          # check: protected tables correctly reject the anon role with 42501.
+          # Branch status and the Auth health endpoint establish availability.
           {
             printf 'VITE_SUPABASE_URL=%s\n' "$target_url"
             # The application keeps these legacy variable names, but their
@@ -185,6 +181,7 @@ runs:
               fi
 
               if [[ "$branch_status" == "FUNCTIONS_DEPLOYED" && "$preview_status" == "ACTIVE_HEALTHY" ]]; then
+                branch_project_ref="$(jq -r '.project_ref // empty' <<< "$branch_record")"
                 if supabase branches get "$BRANCH_NAME" \
                   --project-ref "$PROJECT_REF" \
                   -o env > "$branch_environment" 2> "$cli_error"; then
@@ -203,6 +200,12 @@ runs:
                   if [[ -n "${SUPABASE_URL:-}" && -n "$public_key" && -n "$server_key" ]]; then
                     preview_project_ref="${SUPABASE_URL#https://}"
                     preview_project_ref="${preview_project_ref%%.*}"
+
+                    if [[ -z "$branch_project_ref" || "$preview_project_ref" != "$branch_project_ref" ]]; then
+                      echo "reason=branch-credentials-mismatch" >> "$GITHUB_OUTPUT"
+                      echo "::error::Las credenciales obtenidas no pertenecen a la branch Supabase seleccionada."
+                      exit 1
+                    fi
 
                     if publish_target \
                       "$SUPABASE_URL" \
