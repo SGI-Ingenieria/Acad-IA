@@ -52,33 +52,34 @@ runs:
 
         publish_target() {
           local target_url="$1"
-          local anon_key="$2"
-          local service_role_key="$3"
+          local public_key="$2"
+          local server_key="$3"
           local target_ref="$4"
           local target_source="$5"
 
-          echo "::add-mask::$anon_key"
-          echo "::add-mask::$service_role_key"
+          echo "::add-mask::$public_key"
+          echo "::add-mask::$server_key"
 
-          if [[ -z "$target_url" || -z "$anon_key" || -z "$service_role_key" || -z "$target_ref" ]] || \
+          if [[ -z "$target_url" || -z "$public_key" || -z "$server_key" || -z "$target_ref" ]] || \
             ! curl --fail --silent --show-error --max-time 10 \
-              --header "apikey: $anon_key" \
+              --header "apikey: $public_key" \
               "$target_url/auth/v1/health" > /dev/null; then
             return 1
           fi
 
           if [[ "$target_source" == 'preview' ]] && \
             ! curl --fail --silent --show-error --max-time 10 \
-              --header "apikey: $anon_key" \
-              --header "Authorization: Bearer $anon_key" \
+              --header "apikey: $public_key" \
               "$target_url/rest/v1/roles?select=clave&limit=1" > /dev/null; then
             return 1
           fi
 
           {
             printf 'VITE_SUPABASE_URL=%s\n' "$target_url"
-            printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$anon_key"
-            printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$service_role_key"
+            # The application keeps these legacy variable names, but their
+            # values may be current publishable/secret API keys.
+            printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$public_key"
+            printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$server_key"
             printf 'SUPABASE_PREVIEW_PROJECT_REF=%s\n' "$target_ref"
             echo 'ACADIA_SUPABASE_REMOTE_TESTS=1'
           } >> "$GITHUB_ENV"
@@ -187,19 +188,26 @@ runs:
                 if supabase branches get "$BRANCH_NAME" \
                   --project-ref "$PROJECT_REF" \
                   -o env > "$branch_environment" 2> "$cli_error"; then
+                  # Do not retain an unrelated legacy key when the CLI emits
+                  # only the current SUPABASE_PUBLISHABLE_KEY/SECRET_KEY pair.
+                  unset SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_PUBLISHABLE_KEY
+                  unset SUPABASE_SERVICE_ROLE_KEY SUPABASE_SECRET_KEY
                   set -a
                   # shellcheck disable=SC1090
                   source "$branch_environment"
                   set +a
 
-                  if [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_ANON_KEY:-}" && -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+                  public_key="${SUPABASE_PUBLISHABLE_KEY:-${SUPABASE_ANON_KEY:-}}"
+                  server_key="${SUPABASE_SECRET_KEY:-${SUPABASE_SERVICE_ROLE_KEY:-}}"
+
+                  if [[ -n "${SUPABASE_URL:-}" && -n "$public_key" && -n "$server_key" ]]; then
                     preview_project_ref="${SUPABASE_URL#https://}"
                     preview_project_ref="${preview_project_ref%%.*}"
 
                     if publish_target \
                       "$SUPABASE_URL" \
-                      "$SUPABASE_ANON_KEY" \
-                      "$SUPABASE_SERVICE_ROLE_KEY" \
+                      "$public_key" \
+                      "$server_key" \
                       "$preview_project_ref" \
                       'preview'; then
                       echo "reason=resolved-preview" >> "$GITHUB_OUTPUT"
