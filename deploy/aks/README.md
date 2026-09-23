@@ -434,7 +434,7 @@ Antes del primer despliegue deben existir:
 
 ## Portainer
 
-La consola existente responde con Portainer Business/Essentials 2.39.6 y una
+La consola existente responde con Portainer Business/Essentials 2.45.1 y una
 licencia vigente. AKS usa **Edge Agent Standard**: la conexión del agente sale
 desde AKS hacia el puerto 8000 de Portainer y no publica un `LoadBalancer` del
 agente. El NSG del servidor debe permitir ese puerto sólo desde la IP de salida
@@ -459,8 +459,8 @@ licencia y los demás entornos no cambien. El workflow valida ese límite antes
 de instalar el agente. Mantenga el node pool/autoscaler de AKS en un máximo de
 dos o amplíe la licencia y ajuste `licensed_aks_nodes`.
 
-El workflow descarga el manifiesto oficial Business 2.39, comprueba su SHA-256
-y que la imagen sea exactamente `portainer/agent:2.39.6`, guarda el Edge Key en
+El workflow descarga el manifiesto oficial Business 2.45, comprueba su SHA-256
+y que la imagen sea exactamente `portainer/agent:2.45.1`, guarda el Edge Key en
 un Secret de Kubernetes y espera el rollout. El manifiesto oficial concede
 `cluster-admin` a su ServiceAccount: esto es necesario para la administración
 completa y debe quedar explícitamente aceptado en la revisión del environment.
