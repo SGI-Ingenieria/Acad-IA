@@ -1,8 +1,15 @@
 import { throwIfError } from './_helpers'
 
+import type {
+  WorkspaceAction,
+  WorkspaceAsignatura,
+  WorkspaceIndicator,
+  WorkspacePlan,
+} from '@/features/workspace/types'
 import type { PostgrestError } from '@supabase/supabase-js'
 
 import { supabaseBrowser } from '@/data/supabase/client'
+
 
 export type ContextoMesaTrabajo = {
   rolClave: string
@@ -73,6 +80,23 @@ export type MesaTrabajoInicio = {
   } | null
 }
 
+export type InicioWorkspace = {
+  base: MesaTrabajoInicio
+  capacidades: {
+    puedeCrearPlan: boolean
+    puedeEditarPlan: boolean
+    puedeEditarAsignatura: boolean
+    puedeRevisar: boolean
+    puedeAprobar: boolean
+    puedeAsignarResponsables: boolean
+    puedeUsarIA: boolean
+  }
+  planes: Array<WorkspacePlan>
+  asignaturas: Array<WorkspaceAsignatura>
+  accionesPendientes: Array<WorkspaceAction>
+  indicadores: Array<WorkspaceIndicator>
+}
+
 type RpcResult = PromiseLike<{
   data: unknown
   error: PostgrestError | null
@@ -97,4 +121,17 @@ export async function inicio_mesa_trabajo(
   })
   throwIfError(error)
   return data as MesaTrabajoInicio
+}
+
+export async function inicio_workspace(
+  contexto: ContextoMesaTrabajo,
+): Promise<InicioWorkspace> {
+  const supabase = supabaseBrowser() as unknown as RpcClient
+  const { data, error } = await supabase.rpc('inicio_workspace', {
+    p_rol_clave: contexto.rolClave,
+    p_facultad_id: contexto.facultadId ?? null,
+    p_carrera_id: contexto.carreraId ?? null,
+  })
+  throwIfError(error)
+  return data as InicioWorkspace
 }

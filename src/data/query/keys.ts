@@ -5,6 +5,8 @@ export const qk = {
   effectiveAuthz: () => ['auth', 'effectiveAuthz'] as const,
   inicioRoot: () => ['inicio'] as const,
   inicio: (contexto: unknown) => ['inicio', contexto] as const,
+  inicioWorkspace: (contexto: unknown) =>
+    ['inicio', 'workspace', contexto] as const,
   guia: (clave: string, version: number) => ['guias', clave, version] as const,
 
   // Roots por prefijo: para cancel/snapshot/invalidate de familias completas.

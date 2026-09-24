@@ -7,7 +7,9 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
+  CircleAlert,
   GraduationCap,
+  ListChecks,
   MessageSquareText,
   Settings2,
   ShieldCheck,
@@ -16,6 +18,7 @@ import {
 import { useEffect, useMemo } from 'react'
 
 import type { ContextoMesaTrabajo } from '@/data/api/inicio.api'
+import type { WorkspaceContext } from '@/features/workspace/types'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -29,9 +32,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useMesaTrabajo } from '@/data/hooks/useInicio'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
+import { resolveWorkspace } from '@/features/workspace/resolver'
 import { formatMesAnioEs } from '@/lib/plan-curricular'
 import { rutaContinuacionCurricular } from '@/lib/plan-navigation'
-import { defaultPlanesSearch } from '@/types/search'
+import { cn } from '@/lib/utils'
+import { defaultAsignaturasSearch, defaultPlanesSearch } from '@/types/search'
 
 type InicioSearch = {
   contexto?: string
@@ -78,8 +83,14 @@ function contextoId(contexto: ContextoMesaTrabajo) {
 function InicioPage() {
   const navigate = useNavigate({ from: '/' })
   const search = Route.useSearch()
-  const { session, roleKeys, roleAssignments, isAdmin, isLoading } =
-    usePermissions()
+  const {
+    session,
+    roleKeys,
+    roleAssignments,
+    permissions,
+    isAdmin,
+    isLoading,
+  } = usePermissions()
   const { data: catalogos } = useCatalogosPlanes()
 
   const contextos = useMemo(() => {
@@ -167,8 +178,26 @@ function InicioPage() {
     )
   }
 
-  const data = mesa.data
-  if (!data) return <InicioSkeleton />
+  const workspaceData = mesa.data
+  if (!workspaceData) return <InicioSkeleton />
+  const data = workspaceData.base
+
+  const workspace = resolveWorkspace({
+    usuarioId: session?.user.id ?? '',
+    rolClave: contexto.rolClave,
+    alcance: {
+      facultadId: contexto.facultadId ?? undefined,
+      carreraId: contexto.carreraId ?? undefined,
+    },
+    capacidades: workspaceData.capacidades,
+    planes: workspaceData.planes,
+    asignaturas: workspaceData.asignaturas,
+    accionesPendientes: workspaceData.accionesPendientes,
+    indicadores: workspaceData.indicadores,
+    roleKeys,
+    permissions,
+    isAdmin,
+  })
 
   const esEvaluador = contexto.rolClave === 'EVALUADOR_EXTERNO'
 
@@ -214,6 +243,16 @@ function InicioPage() {
             </Select>
           )}
         </header>
+
+        <WorkspacePriority workspace={workspace} />
+
+        <WorkspacePendingActions workspace={workspace} />
+
+        {workspace.estacion === 'CourseWorkspace' && (
+          <WorkspaceSubjects workspace={workspace} />
+        )}
+
+        <WorkspaceOverview workspace={workspace} />
 
         {data.avisos.length > 0 && (
           <section
@@ -461,6 +500,281 @@ function Indicador({
         <p className="text-muted-foreground text-sm">{etiqueta}</p>
       </div>
     </div>
+  )
+}
+
+function WorkspacePriority({ workspace }: { workspace: WorkspaceContext }) {
+  const action = workspace.accionesPendientes.at(0)
+  return (
+    <section
+      aria-label="Tu prioridad ahora"
+      className="border-primary/30 bg-primary/5 gap-seccion p-region flex flex-col border-y sm:flex-row sm:items-center sm:justify-between"
+      data-guia="prioridad-workspace"
+    >
+      <div className="gap-grupo flex items-start">
+        {action ? (
+          <CircleAlert className="text-warning mt-micro size-6 shrink-0" />
+        ) : (
+          <ListChecks className="text-primary mt-micro size-6 shrink-0" />
+        )}
+        <div>
+          <p className="text-primary text-sm font-semibold">
+            Tu prioridad ahora
+          </p>
+          <h2 className="mt-micro text-xl font-bold">{workspace.titulo}</h2>
+          {action && (
+            <p className="text-muted-foreground mt-micro max-w-2xl text-sm">
+              {action.detalle}
+            </p>
+          )}
+        </div>
+      </div>
+      {workspace.accionPrincipal && (
+        <WorkspaceActionButton
+          action={workspace.accionPrincipal}
+          workspace={workspace}
+        />
+      )}
+    </section>
+  )
+}
+
+function WorkspaceActionButton({
+  action,
+  workspace,
+}: {
+  action: NonNullable<WorkspaceContext['accionPrincipal']>
+  workspace: WorkspaceContext
+}) {
+  const responsibilityMatch = action.ruta.match(
+    /^\/planes\/([^/]+)\/asignaturas\/([^/]+)\/responsables$/,
+  )
+  if (responsibilityMatch) {
+    return (
+      <Button asChild className="shrink-0">
+        <Link
+          to="/planes/$planId/asignaturas/$asignaturaId/responsables"
+          params={{
+            planId: responsibilityMatch[1],
+            asignaturaId: responsibilityMatch[2],
+          }}
+        >
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+
+  const assignment = workspace.asignaturas.find((item) =>
+    action.ruta.includes(`/asignaturas/${item.id}`),
+  )
+  if (assignment) {
+    return (
+      <Button asChild className="shrink-0">
+        <Link
+          to="/planes/$planId/asignaturas/$asignaturaId"
+          params={{ planId: assignment.planId, asignaturaId: assignment.id }}
+        >
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+
+  const planId = action.ruta.match(/^\/planes\/([^/]+)/)?.[1]
+  if (planId && planId !== 'nuevo') {
+    return (
+      <Button asChild className="shrink-0">
+        <Link to="/planes/$planId" params={{ planId }}>
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+
+  if (action.ruta === '/planes/nuevo') {
+    return (
+      <Button asChild className="shrink-0">
+        <Link to="/planes/nuevo" search={defaultPlanesSearch}>
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+
+  return null
+}
+
+function WorkspacePendingActions({
+  workspace,
+}: {
+  workspace: WorkspaceContext
+}) {
+  if (workspace.accionesPendientes.length < 2) return null
+
+  return (
+    <section aria-label="Pendientes prioritarios">
+      <EncabezadoSeccion
+        titulo="Pendientes prioritarios"
+        descripcion="Cada elemento enlaza con la evidencia que lo provoca."
+      />
+      <div className="mt-control divide-y">
+        {workspace.accionesPendientes.slice(0, 8).map((action) => (
+          <div
+            key={action.id}
+            className="gap-grupo px-relacionado py-seccion flex items-center justify-between"
+          >
+            <div className="min-w-0">
+              <p className="truncate font-semibold">{action.titulo}</p>
+              <p className="text-muted-foreground mt-micro truncate text-sm">
+                {action.detalle}
+              </p>
+            </div>
+            <WorkspaceActionButton
+              workspace={workspace}
+              action={{ etiqueta: 'Abrir', ruta: action.ruta }}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {
+  const hasOverview =
+    workspace.indicadores.length > 0 || workspace.planes.length > 0
+  if (!hasOverview) return null
+
+  return (
+    <section aria-label="Estado del trabajo" data-guia="resumen-workspace">
+      <EncabezadoSeccion
+        titulo="Estado del trabajo"
+        descripcion="Indicadores y planes que explican qué requiere atención."
+      />
+      {workspace.indicadores.length > 0 && (
+        <div className="mt-seccion gap-grupo grid sm:grid-cols-2 xl:grid-cols-4">
+          {workspace.indicadores.map((indicator) => (
+            <div
+              key={indicator.id}
+              className="border-border gap-grupo py-seccion flex items-start border-y"
+            >
+              <CircleAlert
+                className={cn(
+                  'mt-micro size-5',
+                  indicator.severidad === 'CRITICA'
+                    ? 'text-destructive'
+                    : 'text-warning',
+                )}
+              />
+              <div>
+                <p className="text-2xl font-bold tabular-nums">
+                  {indicator.valor}
+                </p>
+                <p className="font-medium">{indicator.titulo}</p>
+                <p className="text-muted-foreground mt-micro text-xs">
+                  {indicator.detalle}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {workspace.planes.length > 0 && (
+        <div className="mt-seccion divide-y">
+          {workspace.planes.slice(0, 6).map((plan) => {
+            const progreso = plan.asignaturasTotal
+              ? Math.round(
+                  (plan.asignaturasCompletas / plan.asignaturasTotal) * 100,
+                )
+              : 0
+            return (
+              <Link
+                key={plan.id}
+                to="/planes/$planId/asignaturas"
+                params={{ planId: plan.id }}
+                search={defaultAsignaturasSearch}
+                className="organic-interactive group gap-grupo px-relacionado py-seccion grid md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-center"
+              >
+                <div className="min-w-0">
+                  <h3 className="truncate font-semibold">{plan.nombre}</h3>
+                  <p className="text-muted-foreground mt-micro truncate text-sm">
+                    {plan.facultadNombre} · {plan.carreraNombre}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span>Asignaturas completas</span>
+                    <span className="font-semibold tabular-nums">
+                      {progreso}%
+                    </span>
+                  </div>
+                  <div className="bg-muted mt-micro h-2 overflow-hidden rounded-full">
+                    <div
+                      className="bg-primary h-full rounded-full"
+                      style={{ width: `${progreso}%` }}
+                    />
+                  </div>
+                </div>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5" />
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function WorkspaceSubjects({ workspace }: { workspace: WorkspaceContext }) {
+  if (workspace.asignaturas.length === 0) {
+    return (
+      <section className="border-border gap-grupo py-region flex items-center border-y">
+        <GraduationCap className="text-muted-foreground size-6" />
+        <div>
+          <h2 className="font-semibold">No tienes asignaturas asignadas</h2>
+          <p className="text-muted-foreground mt-micro text-sm">
+            Cuando te asignen una asignatura aparecerá aquí con sus pendientes.
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section aria-label="Mis asignaturas" data-guia="asignaturas-workspace">
+      <EncabezadoSeccion
+        titulo="Mis asignaturas"
+        descripcion="Continúa desde el punto concreto que requiere trabajo."
+      />
+      <div className="mt-control divide-y">
+        {workspace.asignaturas.map((asignatura) => (
+          <Link
+            key={asignatura.id}
+            to="/planes/$planId/asignaturas/$asignaturaId"
+            params={{ planId: asignatura.planId, asignaturaId: asignatura.id }}
+            className="organic-interactive group gap-grupo px-relacionado py-seccion flex items-center justify-between"
+          >
+            <div className="min-w-0">
+              <h3 className="truncate font-semibold">{asignatura.nombre}</h3>
+              <p className="text-muted-foreground mt-micro truncate text-sm">
+                {asignatura.planNombre} · {asignatura.carreraNombre}
+              </p>
+            </div>
+            <div className="gap-control flex shrink-0 items-center">
+              <span className="text-muted-foreground text-sm tabular-nums">
+                {asignatura.progreso}%
+              </span>
+              <ArrowRight className="text-muted-foreground group-hover:text-primary size-5" />
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
   )
 }
 
