@@ -88,6 +88,7 @@ export const planesEstadosDisponiblesOptions = (
     | 'carreraId'
     | 'nivelFilter'
     | 'tipoEstructura'
+    | 'versionPlan'
     | 'catalogMode'
   >,
 ) =>

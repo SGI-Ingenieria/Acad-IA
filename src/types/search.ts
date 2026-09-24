@@ -21,7 +21,7 @@ export type PlanesListaSearch = {
   estado: string
   nivel: string
   tipo: 'todos' | 'CURRICULAR' | 'NO_CURRICULAR'
-  version: 'actuales' | 'antecedentes' | 'todos'
+  version: 'actuales' | 'antecedentes' | 'descartados' | 'todos'
   orden: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
 }
 

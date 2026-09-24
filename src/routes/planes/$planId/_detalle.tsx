@@ -19,6 +19,7 @@ import {
   FileCheck2,
   Wand2,
   ArrowRightLeft,
+  ArchiveX,
   Users,
   FileInput,
 } from 'lucide-react'
@@ -54,6 +55,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import {
   Tooltip,
   TooltipContent,
@@ -73,6 +75,7 @@ import {
   usePlanAsignaturas,
   usePlanLineas,
   usePlanRegistroOficial,
+  useDiscardPlanEstudio,
   useUpdatePlanFields,
 } from '@/data/hooks/usePlans'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
@@ -105,6 +108,7 @@ import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
+import { notify } from '@/lib/toast'
 import { IaPlanChatView } from '@/routes/planes/$planId/_detalle/iaplan'
 import {
   defaultPlanDetalleSearch,
@@ -137,11 +141,7 @@ const planTabsDespuesCurriculo = [
 ] as const
 
 type PlanContextualPanel =
-  | 'comentarios'
-  | 'ia'
-  | 'flujo'
-  | 'expertos'
-  | 'historial'
+  'comentarios' | 'ia' | 'flujo' | 'expertos' | 'historial'
 
 function PlanNotFoundPage() {
   return (
@@ -187,6 +187,7 @@ function RouteComponent() {
   const { planId } = Route.useParams()
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
+  const discardPlan = useDiscardPlanEstudio()
   const navigate = useNavigate()
   const router = useRouter()
   const pathname = useRouterState({
@@ -690,7 +691,9 @@ function RouteComponent() {
         </main>
 
         <PlanCommentsManager
-          isReadOnly={Boolean(data?.estados_plan?.es_final)}
+          isReadOnly={Boolean(
+            data?.estados_plan?.es_final || capabilities.isDiscarded,
+          )}
         />
 
         <ContextualActionsMenu
@@ -714,7 +717,7 @@ function RouteComponent() {
               id: 'etapa',
               label: 'Cambiar etapa',
               icon: ArrowRightLeft,
-              hidden: capabilities.isAntecedente,
+              hidden: capabilities.isAntecedente || capabilities.isDiscarded,
               grupo: 'Flujo del plan',
             },
             {
@@ -744,6 +747,14 @@ function RouteComponent() {
               grupo: 'Revisión',
             },
             {
+              id: 'descartar',
+              label: 'Descartar plan',
+              icon: ArchiveX,
+              hidden: !capabilities.canDiscardPlan,
+              variant: 'destructive',
+              grupo: 'Revisión',
+            },
+            {
               id: 'original',
               label: 'Ver original',
               icon: FileInput,
@@ -754,7 +765,7 @@ function RouteComponent() {
               grupo: 'Revisión',
             },
           ]}
-          onSelect={(id) => {
+          onSelect={async (id) => {
             // El modo agente no es un panel: cambia el comportamiento de toda
             // la página, así que no abre el Sheet.
             if (id === 'agente') {
@@ -770,6 +781,27 @@ function RouteComponent() {
               // Mover el plan de etapa es una acción, no una lectura: se abre
               // su diálogo directamente en vez de pasar por el panel de flujo.
               setTransicionAbierta(true)
+            } else if (id === 'descartar') {
+              const confirmed = await showAppConfirm({
+                title: 'Descartar y archivar el plan',
+                description:
+                  'El plan se archivará y quedará en modo solo lectura. Ya no aparecerá en el panel principal; podrás consultarlo desde el filtro “Descartados”. Esta acción no puede deshacerse.',
+                confirmLabel: 'Descartar plan',
+                variant: 'destructive',
+              })
+              if (!confirmed) return
+
+              try {
+                await discardPlan.mutateAsync(planId)
+                notify.success('Plan descartado y archivado.')
+                await navigate({
+                  to: '/planes',
+                  search: { ...defaultPlanesSearch, version: 'descartados' },
+                  resetScroll: false,
+                })
+              } catch {
+                // El MutationCache muestra el error tipado de la operación.
+              }
             } else if (id === 'comentarios') {
               openCommentsPanel()
             } else {
@@ -906,7 +938,7 @@ function RouteComponent() {
           </SheetContent>
         </Sheet>
 
-        {!capabilities.isAntecedente ? (
+        {!capabilities.isAntecedente && !capabilities.isDiscarded ? (
           <TransicionEstadoDialog
             planId={planId}
             open={transicionAbierta}

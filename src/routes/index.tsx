@@ -15,12 +15,25 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { ContextoMesaTrabajo } from '@/data/api/inicio.api'
-import type { WorkspaceContext } from '@/features/workspace/types'
+import type {
+  WorkspaceAction,
+  WorkspaceAsignatura,
+  WorkspaceContext,
+  WorkspacePlan,
+} from '@/features/workspace/types'
 
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
@@ -614,47 +627,183 @@ function WorkspacePendingActions({
 }: {
   workspace: WorkspaceContext
 }) {
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const groups = groupPendingActions(workspace.accionesPendientes)
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId)
   if (workspace.accionesPendientes.length < 2) return null
 
   return (
     <section aria-label="Pendientes prioritarios">
       <EncabezadoSeccion
         titulo="Pendientes prioritarios"
-        descripcion="Cada elemento enlaza con la evidencia que lo provoca."
+        descripcion="Agrupados por el cambio que requieren."
       />
-      <div className="mt-control divide-y">
-        {workspace.accionesPendientes.slice(0, 8).map((action) => (
-          <div
-            key={action.id}
-            className="gap-grupo px-relacionado py-seccion flex items-center justify-between"
+      <div className="mt-seccion gap-grupo grid sm:grid-cols-2 xl:grid-cols-3">
+        {groups.map((group) => (
+          <Button
+            key={group.id}
+            type="button"
+            variant="outline"
+            className="organic-interactive border-border hover:border-primary/45 p-seccion h-auto min-h-32 justify-start text-left whitespace-normal"
+            onClick={() => setSelectedGroupId(group.id)}
           >
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{action.titulo}</p>
-              <p className="text-muted-foreground mt-micro truncate text-sm">
-                {action.detalle}
-              </p>
-            </div>
-            <WorkspaceActionButton
-              workspace={workspace}
-              action={{ etiqueta: 'Abrir', ruta: action.ruta }}
+            <CircleAlert
+              className={cn(
+                'mt-micro size-5 shrink-0',
+                group.severidad === 'CRITICA'
+                  ? 'text-destructive'
+                  : 'text-warning',
+              )}
             />
-          </div>
+            <span className="ml-control min-w-0">
+              <span className="block text-3xl font-bold tabular-nums">
+                {group.actions.length}
+              </span>
+              <span className="mt-micro block font-semibold">
+                {group.titulo}
+              </span>
+              <span className="text-muted-foreground mt-relacionado block text-xs">
+                Seleccionar elementos
+              </span>
+            </span>
+          </Button>
         ))}
       </div>
+
+      <WorkspaceSelectionDialog
+        open={selectedGroup !== undefined}
+        onOpenChange={(open) => !open && setSelectedGroupId(null)}
+        titulo={selectedGroup?.titulo ?? 'Pendientes'}
+        descripcion="Selecciona el elemento que deseas atender."
+      >
+        {selectedGroup && (
+          <div className="divide-y">
+            {selectedGroup.actions.map((action) => (
+              <div
+                key={action.id}
+                className="gap-grupo py-control flex items-center justify-between"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{action.titulo}</p>
+                  <p className="text-muted-foreground mt-micro truncate text-sm">
+                    {action.detalle}
+                  </p>
+                </div>
+                <WorkspaceActionButton
+                  workspace={workspace}
+                  action={{ etiqueta: 'Abrir', ruta: action.ruta }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </WorkspaceSelectionDialog>
     </section>
   )
+}
+
+function WorkspaceSelectionDialog({
+  open,
+  onOpenChange,
+  titulo,
+  descripcion,
+  children,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  titulo: string
+  descripcion: string
+  children: React.ReactNode
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="grid max-h-[min(38rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)]">
+        <DialogHeader>
+          <DialogTitle>{titulo}</DialogTitle>
+          <DialogDescription>{descripcion}</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="overflow-y-auto">{children}</DialogBody>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function groupPendingActions(actions: Array<WorkspaceAction>) {
+  const groups = new Map<
+    string,
+    {
+      id: string
+      titulo: string
+      severidad: WorkspaceAction['severidad']
+      actions: Array<WorkspaceAction>
+    }
+  >()
+  const severityRank = { CRITICA: 0, ALTA: 1, MEDIA: 2, BAJA: 3 }
+
+  for (const action of actions) {
+    const titulo = action.detalle?.trim() || action.tipo
+    const id = `${action.tipo}:${titulo}`
+    const group = groups.get(id)
+    if (group) {
+      group.actions.push(action)
+      if (severityRank[action.severidad] < severityRank[group.severidad]) {
+        group.severidad = action.severidad
+      }
+    } else {
+      groups.set(id, {
+        id,
+        titulo,
+        severidad: action.severidad,
+        actions: [action],
+      })
+    }
+  }
+
+  return Array.from(groups.values()).sort(
+    (left, right) =>
+      severityRank[left.severidad] - severityRank[right.severidad] ||
+      right.actions.length - left.actions.length,
+  )
+}
+
+function groupWorkspacePlans(plans: Array<WorkspacePlan>) {
+  const groups = new Map<string, Array<WorkspacePlan>>()
+
+  for (const plan of plans) {
+    const title = plan.estadoEtiqueta ?? 'Sin etapa definida'
+    const group = groups.get(title)
+    if (group) group.push(plan)
+    else groups.set(title, [plan])
+  }
+
+  return Array.from(groups, ([titulo, items]) => ({
+    id: titulo,
+    titulo,
+    planes: items,
+    progresoPromedio: Math.round(
+      items.reduce((total, plan) => {
+        const progreso = plan.asignaturasTotal
+          ? (plan.asignaturasCompletas / plan.asignaturasTotal) * 100
+          : 0
+        return total + progreso
+      }, 0) / items.length,
+    ),
+  }))
 }
 
 function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {
   const hasOverview =
     workspace.indicadores.length > 0 || workspace.planes.length > 0
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const planGroups = groupWorkspacePlans(workspace.planes)
+  const selectedGroup = planGroups.find((group) => group.id === selectedGroupId)
   if (!hasOverview) return null
 
   return (
     <section aria-label="Estado del trabajo" data-guia="resumen-workspace">
       <EncabezadoSeccion
         titulo="Estado del trabajo"
-        descripcion="Indicadores y planes que explican qué requiere atención."
+        descripcion="Indicadores y agrupaciones para priorizar el siguiente paso."
       />
       {workspace.indicadores.length > 0 && (
         <div className="mt-seccion gap-grupo grid sm:grid-cols-2 xl:grid-cols-4">
@@ -685,52 +834,74 @@ function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {
         </div>
       )}
       {workspace.planes.length > 0 && (
-        <div className="mt-seccion divide-y">
-          {workspace.planes.slice(0, 6).map((plan) => {
-            const progreso = plan.asignaturasTotal
-              ? Math.round(
-                  (plan.asignaturasCompletas / plan.asignaturasTotal) * 100,
-                )
-              : 0
-            return (
-              <Link
-                key={plan.id}
-                to="/planes/$planId/asignaturas"
-                params={{ planId: plan.id }}
-                search={defaultAsignaturasSearch}
-                className="organic-interactive group gap-grupo px-relacionado py-seccion grid md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-center"
-              >
-                <div className="min-w-0">
-                  <h3 className="truncate font-semibold">{plan.nombre}</h3>
-                  <p className="text-muted-foreground mt-micro truncate text-sm">
-                    {plan.facultadNombre} · {plan.carreraNombre}
-                  </p>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span>Asignaturas completas</span>
-                    <span className="font-semibold tabular-nums">
-                      {progreso}%
-                    </span>
-                  </div>
-                  <div className="bg-muted mt-micro h-2 overflow-hidden rounded-full">
-                    <div
-                      className="bg-primary h-full rounded-full"
-                      style={{ width: `${progreso}%` }}
-                    />
-                  </div>
-                </div>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5" />
-              </Link>
-            )
-          })}
+        <div className="mt-seccion gap-grupo grid sm:grid-cols-2 xl:grid-cols-3">
+          {planGroups.map((group) => (
+            <Button
+              key={group.id}
+              type="button"
+              variant="outline"
+              className="organic-interactive border-border hover:border-primary/45 p-seccion h-auto min-h-32 justify-start text-left whitespace-normal"
+              onClick={() => setSelectedGroupId(group.id)}
+            >
+              <BookOpenText className="text-primary mt-micro size-5 shrink-0" />
+              <span className="ml-control min-w-0">
+                <span className="block text-3xl font-bold tabular-nums">
+                  {group.planes.length}
+                </span>
+                <span className="mt-micro block font-semibold">
+                  {group.titulo}
+                </span>
+                <span className="text-muted-foreground mt-relacionado block text-xs">
+                  {group.progresoPromedio}% de asignaturas completas
+                </span>
+              </span>
+            </Button>
+          ))}
         </div>
       )}
+      <WorkspaceSelectionDialog
+        open={selectedGroup !== undefined}
+        onOpenChange={(open) => !open && setSelectedGroupId(null)}
+        titulo={selectedGroup?.titulo ?? 'Planes'}
+        descripcion="Selecciona el plan que deseas consultar."
+      >
+        {selectedGroup && (
+          <div className="divide-y">
+            {selectedGroup.planes.map((plan) => {
+              const progreso = plan.asignaturasTotal
+                ? Math.round(
+                    (plan.asignaturasCompletas / plan.asignaturasTotal) * 100,
+                  )
+                : 0
+              return (
+                <Link
+                  key={plan.id}
+                  to="/planes/$planId/asignaturas"
+                  params={{ planId: plan.id }}
+                  search={defaultAsignaturasSearch}
+                  className="organic-interactive gap-grupo py-control flex items-center justify-between"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">
+                      {plan.nombre}
+                    </span>
+                    <span className="text-muted-foreground mt-micro block truncate text-sm">
+                      {plan.facultadNombre} · {plan.carreraNombre} · {progreso}%
+                    </span>
+                  </span>
+                  <ArrowRight className="text-muted-foreground size-5 shrink-0" />
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </WorkspaceSelectionDialog>
     </section>
   )
 }
 
 function WorkspaceSubjects({ workspace }: { workspace: WorkspaceContext }) {
+  const [selectorOpen, setSelectorOpen] = useState(false)
   if (workspace.asignaturas.length === 0) {
     return (
       <section className="border-border gap-grupo py-region flex items-center border-y">
@@ -745,36 +916,81 @@ function WorkspaceSubjects({ workspace }: { workspace: WorkspaceContext }) {
     )
   }
 
+  const progresoPromedio = Math.round(
+    workspace.asignaturas.reduce(
+      (total, asignatura) => total + asignatura.progreso,
+      0,
+    ) / workspace.asignaturas.length,
+  )
+
   return (
     <section aria-label="Mis asignaturas" data-guia="asignaturas-workspace">
       <EncabezadoSeccion
         titulo="Mis asignaturas"
-        descripcion="Continúa desde el punto concreto que requiere trabajo."
+        descripcion="Selecciona una asignatura para continuar su desarrollo."
       />
-      <div className="mt-control divide-y">
-        {workspace.asignaturas.map((asignatura) => (
-          <Link
-            key={asignatura.id}
-            to="/planes/$planId/asignaturas/$asignaturaId"
-            params={{ planId: asignatura.planId, asignaturaId: asignatura.id }}
-            className="organic-interactive group gap-grupo px-relacionado py-seccion flex items-center justify-between"
-          >
-            <div className="min-w-0">
-              <h3 className="truncate font-semibold">{asignatura.nombre}</h3>
-              <p className="text-muted-foreground mt-micro truncate text-sm">
-                {asignatura.planNombre} · {asignatura.carreraNombre}
-              </p>
-            </div>
-            <div className="gap-control flex shrink-0 items-center">
-              <span className="text-muted-foreground text-sm tabular-nums">
-                {asignatura.progreso}%
-              </span>
-              <ArrowRight className="text-muted-foreground group-hover:text-primary size-5" />
-            </div>
-          </Link>
-        ))}
+      <div className="mt-seccion max-w-sm">
+        <Button
+          type="button"
+          variant="outline"
+          className="organic-interactive border-border hover:border-primary/45 p-seccion h-auto min-h-32 w-full justify-start text-left whitespace-normal"
+          onClick={() => setSelectorOpen(true)}
+        >
+          <GraduationCap className="text-primary mt-micro size-5 shrink-0" />
+          <span className="ml-control min-w-0">
+            <span className="block text-3xl font-bold tabular-nums">
+              {workspace.asignaturas.length}
+            </span>
+            <span className="mt-micro block font-semibold">
+              Asignaturas a mi cargo
+            </span>
+            <span className="text-muted-foreground mt-relacionado block text-xs">
+              {progresoPromedio}% de avance promedio
+            </span>
+          </span>
+        </Button>
       </div>
+      <WorkspaceSelectionDialog
+        open={selectorOpen}
+        onOpenChange={setSelectorOpen}
+        titulo="Asignaturas a mi cargo"
+        descripcion="Selecciona una asignatura para abrir su espacio de trabajo."
+      >
+        <div className="divide-y">
+          {workspace.asignaturas.map((asignatura) => (
+            <WorkspaceSubjectOption
+              key={asignatura.id}
+              asignatura={asignatura}
+            />
+          ))}
+        </div>
+      </WorkspaceSelectionDialog>
     </section>
+  )
+}
+
+function WorkspaceSubjectOption({
+  asignatura,
+}: {
+  asignatura: WorkspaceAsignatura
+}) {
+  return (
+    <Link
+      to="/planes/$planId/asignaturas/$asignaturaId"
+      params={{ planId: asignatura.planId, asignaturaId: asignatura.id }}
+      className="organic-interactive gap-grupo py-control flex items-center justify-between"
+    >
+      <span className="min-w-0">
+        <span className="block truncate font-semibold">
+          {asignatura.nombre}
+        </span>
+        <span className="text-muted-foreground mt-micro block truncate text-sm">
+          {asignatura.planNombre} · {asignatura.carreraNombre} ·{' '}
+          {asignatura.progreso}%
+        </span>
+      </span>
+      <ArrowRight className="text-muted-foreground size-5 shrink-0" />
+    </Link>
   )
 }
 

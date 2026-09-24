@@ -529,10 +529,6 @@ Deno.serve(async (request) => {
       archivo: string
       rol: ReturnType<typeof clasificarArchivoAcademico>['rol']
     }> = []
-    const clasificacionesContenido: Array<{
-      archivo: string
-      rol: ReturnType<typeof clasificarArchivoAcademico>['rol']
-    }> = []
     const documentFileIds: Array<string> = []
     const fallbackDocumentFileIds: Array<string> = []
     const extractedDocuments: Array<{ filename: string; content: string }> = []
@@ -649,10 +645,6 @@ Deno.serve(async (request) => {
               mime: blob.detected_mime,
               contenido: layout.content,
             })
-            clasificacionesContenido.push({
-              archivo: version.original_filename,
-              rol: contentClassification.rol,
-            })
             await supabase
               .from('importacion_archivos')
               .update({
@@ -703,10 +695,6 @@ Deno.serve(async (request) => {
         azureExtractionTasks.slice(index, index + 4).map((task) => task()),
       )
     }
-    console.info('academic-import-analyze content classifications', {
-      classifications: clasificacionesContenido,
-    })
-
     const documentoNoAcademico = extractedDocuments.find(({ content }) =>
       esContenidoClaramenteNoAcademico(content),
     )
@@ -715,25 +703,6 @@ Deno.serve(async (request) => {
         422,
         `El archivo "${documentoNoAcademico.filename}" no corresponde a un expediente académico. Retíralo antes de continuar.`,
         'IMPORT_IRRELEVANT_FILE',
-      )
-    }
-
-    // El nombre de un archivo puede ser arbitrario. Cuando Azure pudo leerlo,
-    // la clasificación basada en su contenido es la evidencia autoritativa para
-    // decidir si vale la pena pedir una extracción curricular al modelo.
-    const clasificacionesDisponibles =
-      clasificacionesContenido.length > 0
-        ? clasificacionesContenido
-        : clasificacionesIniciales
-    if (
-      mapSubjects.length === 0 &&
-      clasificacionesDisponibles.length > 0 &&
-      clasificacionesDisponibles.every(({ rol }) => rol === 'OTRO')
-    ) {
-      throw new HttpError(
-        422,
-        'Los archivos se pudieron leer, pero no corresponden a un expediente académico. Sube un plan de estudios, mapa curricular, programa de asignatura o resolución.',
-        'IMPORT_NOT_ACADEMIC_CONTENT',
       )
     }
 
@@ -931,6 +900,9 @@ Deno.serve(async (request) => {
         fecha_inicio_imparticion: null,
       },
     }
+    // La decisión se toma después de procesar tanto el mapa como el resultado
+    // de OpenAI. Los nombres de los archivos y un fallo del proveedor de
+    // layout no bastan para descartar un expediente válido.
     if (!contieneResultadoAcademico(extracted, mapSubjects)) {
       throw new HttpError(
         422,

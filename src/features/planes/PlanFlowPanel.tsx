@@ -90,7 +90,8 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
 
   const estaRechazado = estadoActual?.clave === 'RECHAZADO'
   const ordenActual = estadoActual?.orden ?? -999
-  const puedeTransicionar = (permitidas?.length ?? 0) > 0
+  const puedeTransicionar =
+    !plan?.descartado_en && (permitidas?.length ?? 0) > 0
   const etapaActualIndex = pipeline.findIndex(
     (estado) => estado.id === estadoActualId,
   )
