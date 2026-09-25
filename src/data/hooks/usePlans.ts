@@ -11,6 +11,7 @@ import {
   plan_registro_oficial_upsert,
   plans_clone_from_existing,
   plans_create_manual,
+  plans_discard,
   plans_delete,
   plans_generate_document,
   plans_persist_from_ai,
@@ -509,6 +510,25 @@ export function useTransitionPlanEstado() {
       qc.invalidateQueries({ queryKey: qk.comentariosPlan(vars.planId) })
       qc.invalidateQueries({ queryKey: qk.transicionesPermitidas(vars.planId) })
       qc.invalidateQueries({ queryKey: qk.planesListRoot() })
+    },
+  })
+}
+
+export function useDiscardPlanEstudio() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (planId: UUID) => plans_discard(planId),
+    meta: {
+      errorMessage: 'No se pudo descartar el plan.',
+      retryable: false,
+    },
+    onSuccess: (_result, planId) => {
+      qc.invalidateQueries({ queryKey: qk.plan(planId) })
+      qc.invalidateQueries({ queryKey: qk.planesListRoot() })
+      qc.invalidateQueries({ queryKey: qk.planesEstadosDisponibles({}) })
+      qc.invalidateQueries({ queryKey: qk.transicionesPermitidas(planId) })
+      qc.invalidateQueries({ queryKey: qk.planHistorial(planId) })
     },
   })
 }

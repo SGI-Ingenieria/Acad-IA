@@ -83,6 +83,7 @@ const parsePlanesSearch = (
   const version =
     search.version === 'actuales' ||
     search.version === 'antecedentes' ||
+    search.version === 'descartados' ||
     search.version === 'todos'
       ? search.version
       : defaultPlanesSearch.version
@@ -406,7 +407,8 @@ function RouteComponent() {
     (selectedCarrera !== 'todas' && !scope.forcedCarreraId) ||
     routeSearch.estado !== 'todos' ||
     (selectedNivel !== 'todos' && !forcedNivel) ||
-    routeSearch.tipo !== 'todos'
+    routeSearch.tipo !== 'todos' ||
+    routeSearch.version !== 'actuales'
   const hasNoPlanes =
     !isLoading && !isError && totalPlanes === 0 && !hasActiveUserFilters
   const cargarMasPlanes = useCallback(() => {
@@ -764,6 +766,10 @@ function RouteComponent() {
                                       value: 'antecedentes',
                                       label: 'Antecedentes',
                                     },
+                                    {
+                                      value: 'descartados',
+                                      label: 'Descartados',
+                                    },
                                     { value: 'todos', label: 'Todos' },
                                   ]}
                                   value={draft.version}
@@ -773,6 +779,7 @@ function RouteComponent() {
                                       version: version as
                                         | 'actuales'
                                         | 'antecedentes'
+                                        | 'descartados'
                                         | 'todos',
                                     }))
                                   }
@@ -822,13 +829,13 @@ function RouteComponent() {
                         const estado = plan.estados_plan
                         const canOpenDetail = plan.puede_abrir_detalle !== false
                         const estadoColorHex = (estado as any)?.color as
-                          | string
-                          | undefined
+                          string | undefined
                         const clave = String(estado?.clave ?? '').toUpperCase()
                         const esCurricularLista =
                           plan.estructuras_plan?.tipo === 'CURRICULAR'
-                        const etiquetaEstadoLista =
-                          plan.rol_version_plan === 'ANTECEDENTE'
+                        const etiquetaEstadoLista = plan.descartado_en
+                          ? 'Descartado · solo lectura'
+                          : plan.rol_version_plan === 'ANTECEDENTE'
                             ? 'Antecedente'
                             : !esCurricularLista && clave === 'APROBADO'
                               ? 'Aprobado por Vicerrectoría'

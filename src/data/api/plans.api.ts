@@ -40,6 +40,7 @@ const EDGE = {
   // plans_update_fields: 'plans_update_fields',
   plans_update_map: 'plans_update_map',
   plans_transition_state: 'plans_transition_state',
+  plans_discard: 'plans_discard',
 
   plans_generate_document: 'plans_generate_document',
   plans_get_document: 'plans_get_document',
@@ -53,7 +54,7 @@ export type PlanListFilters = {
   activo?: boolean
   nivelFilter?: string // filtra por carreras.nivel
   tipoEstructura?: TipoEstructuraPlan
-  versionPlan?: 'actuales' | 'antecedentes' | 'todos'
+  versionPlan?: 'actuales' | 'antecedentes' | 'descartados' | 'todos'
   catalogMode?: boolean
   sort?: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
 
@@ -1379,6 +1380,11 @@ export async function plans_transition_state(payload: {
   registroOficial?: PlanRegistroOficialInput
 }): Promise<{ ok: true }> {
   return invokeEdge<{ ok: true }>(EDGE.plans_transition_state, payload)
+}
+
+/** Archiva de forma irreversible una versión de trabajo descartada. */
+export async function plans_discard(planId: UUID): Promise<{ ok: true }> {
+  return invokeEdge<{ ok: true }>(EDGE.plans_discard, { planId })
 }
 
 /** Documento (Edge Function: genera y devuelve URL firmada o metadata) */

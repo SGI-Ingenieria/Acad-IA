@@ -26,6 +26,7 @@ export type ContextualMenuOption = {
   badge?: number
   hidden?: boolean
   disabled?: boolean
+  variant?: 'default' | 'destructive'
   /**
    * Encabezado bajo el que se agrupa la acción. Sin él, el menú es una rejilla
    * plana de cartitas en la que «Comentarios», «Modo agente» e «Historial»
@@ -120,6 +121,8 @@ function Cartitas({
             className={cn(
               'group p-grupo relative h-30 items-start justify-start overflow-hidden rounded-lg border text-left',
               'bg-background hover:border-primary/50 hover:bg-primary/5',
+              option.variant === 'destructive' &&
+                'hover:border-destructive/50 hover:bg-destructive/5',
               'transition-[color,background-color,border-color]',
             )}
             onPointerEnter={(event) =>
@@ -133,10 +136,20 @@ function Cartitas({
             onClick={() => onSelect(option.id)}
           >
             <span className="flex h-full min-w-0 flex-col justify-between">
-              <span className="bg-muted group-hover:bg-primary/10 flex size-10 items-center justify-center rounded-lg transition-colors">
+              <span
+                className={cn(
+                  'bg-muted group-hover:bg-primary/10 flex size-10 items-center justify-center rounded-lg transition-colors',
+                  option.variant === 'destructive' &&
+                    'group-hover:bg-destructive/10',
+                )}
+              >
                 <Icon
                   data-motion-icon
-                  className="text-muted-foreground group-hover:text-primary size-6 transition-colors"
+                  className={cn(
+                    'text-muted-foreground group-hover:text-primary size-6 transition-colors',
+                    option.variant === 'destructive' &&
+                      'group-hover:text-destructive',
+                  )}
                 />
               </span>
               <span className="text-sm leading-snug font-medium whitespace-normal">

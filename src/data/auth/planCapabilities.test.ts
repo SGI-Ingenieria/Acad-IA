@@ -12,11 +12,13 @@ function planFixture(input: {
   carreraId: string
   facultadId: string
   nivel: string
+  descartadoEn?: string | null
 }): PlanEstudio {
   return {
     id: 'plan-1',
     carrera_id: input.carreraId,
     estados_plan: { clave: input.estado },
+    descartado_en: input.descartadoEn ?? null,
     carreras: {
       id: input.carreraId,
       facultad_id: input.facultadId,
@@ -38,6 +40,30 @@ function assignment(
 }
 
 describe('buildPlanCapabilities scoped roles', () => {
+  test('freezes a discarded plan even for its normal editor', () => {
+    const capabilities = buildPlanCapabilities({
+      plan: planFixture({
+        estado: 'BORRADOR',
+        carreraId: 'car-1',
+        facultadId: 'fac-1',
+        nivel: 'Licenciatura',
+        descartadoEn: '2026-09-10T12:00:00.000Z',
+      }),
+      roleKeys: new Set(['SECRETARIO_ACADEMICO']),
+      roleAssignments: [
+        assignment('SECRETARIO_ACADEMICO', { facultad_id: 'fac-1' }),
+      ],
+      isAdmin: false,
+      has: hasIA,
+    })
+
+    expect(capabilities.isDiscarded).toBe(true)
+    expect(capabilities.canEditPlan).toBe(false)
+    expect(capabilities.canEditAsignaturas).toBe(false)
+    expect(capabilities.canDiscardPlan).toBe(false)
+    expect(capabilities.canComment).toBe(false)
+  })
+
   test('allows JEFE_POSGRADO to edit postgraduate plans in its faculty', () => {
     const capabilities = buildPlanCapabilities({
       plan: planFixture({
