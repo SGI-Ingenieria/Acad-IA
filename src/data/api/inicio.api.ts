@@ -5,11 +5,11 @@ import type {
   WorkspaceAsignatura,
   WorkspaceIndicator,
   WorkspacePlan,
+  WorkspaceProgress,
 } from '@/features/workspace/types'
 import type { PostgrestError } from '@supabase/supabase-js'
 
 import { supabaseBrowser } from '@/data/supabase/client'
-
 
 export type ContextoMesaTrabajo = {
   rolClave: string
@@ -95,6 +95,7 @@ export type InicioWorkspace = {
   asignaturas: Array<WorkspaceAsignatura>
   accionesPendientes: Array<WorkspaceAction>
   indicadores: Array<WorkspaceIndicator>
+  progreso: WorkspaceProgress
 }
 
 type RpcResult = PromiseLike<{

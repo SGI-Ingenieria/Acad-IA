@@ -19,6 +19,7 @@ const base = {
   asignaturas: [],
   accionesPendientes: [],
   indicadores: [],
+  progreso: { completadas: 0, pendientes: 0, total: 0, porcentaje: 100 },
 }
 
 describe('resolveWorkspace', () => {

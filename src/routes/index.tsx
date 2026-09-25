@@ -45,6 +45,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useMesaTrabajo } from '@/data/hooks/useInicio'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
+import {
+  buildWorkspaceDashboard,
+  groupActionsByPlan,
+  groupSubjectsByPlan,
+} from '@/features/workspace/dashboard'
 import { resolveWorkspace } from '@/features/workspace/resolver'
 import { formatMesAnioEs } from '@/lib/plan-curricular'
 import { rutaContinuacionCurricular } from '@/lib/plan-navigation'
@@ -207,6 +212,7 @@ function InicioPage() {
     asignaturas: workspaceData.asignaturas,
     accionesPendientes: workspaceData.accionesPendientes,
     indicadores: workspaceData.indicadores,
+    progreso: workspaceData.progreso,
     roleKeys,
     permissions,
     isAdmin,
@@ -259,13 +265,19 @@ function InicioPage() {
 
         <WorkspacePriority workspace={workspace} />
 
-        <WorkspacePendingActions workspace={workspace} />
-
-        {workspace.estacion === 'CourseWorkspace' && (
-          <WorkspaceSubjects workspace={workspace} />
-        )}
-
-        <WorkspaceOverview workspace={workspace} />
+        <section
+          aria-label="Resumen del espacio de trabajo"
+          className="gap-seccion grid xl:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.2fr)]"
+        >
+          <WorkspaceProgress workspace={workspace} />
+          <div className="gap-seccion grid content-start">
+            <WorkspacePendingActions workspace={workspace} />
+            {workspace.estacion === 'CourseWorkspace' && (
+              <WorkspaceSubjects workspace={workspace} />
+            )}
+            <WorkspaceOverview workspace={workspace} />
+          </div>
+        </section>
 
         {data.avisos.length > 0 && (
           <section
@@ -297,10 +309,7 @@ function InicioPage() {
         )}
 
         {!esEvaluador && (
-          <section
-            aria-label="Hitos de trabajo"
-            className="gap-x-region gap-y-seccion py-seccion grid border-y sm:grid-cols-2 xl:grid-cols-4"
-          >
+          <section aria-label="Hitos de trabajo" className="hidden">
             <Indicador
               icon={BookOpenText}
               valor={data.resumen.planes}
@@ -325,7 +334,7 @@ function InicioPage() {
         )}
 
         {data.saludOperativa && (
-          <section data-guia="salud-operativa">
+          <section data-guia="salud-operativa" className="hidden">
             <EncabezadoSeccion
               titulo="Salud operativa"
               descripcion="Configuraciones que pueden impedir o degradar el trabajo académico."
@@ -345,7 +354,7 @@ function InicioPage() {
           </section>
         )}
 
-        <section data-guia="requiere-atencion">
+        <section data-guia="requiere-atencion" className="hidden">
           <EncabezadoSeccion
             titulo="Requiere tu atención"
             descripcion="Decisiones y revisiones que están esperando tu participación."
@@ -386,7 +395,7 @@ function InicioPage() {
 
         {data.facultades.length > 1 &&
           ['ADMIN', 'VICERRECTOR_ACADEMICO'].includes(contexto.rolClave) && (
-            <section>
+            <section className="hidden">
               <EncabezadoSeccion
                 titulo="Facultades"
                 descripcion="Una lectura institucional por etapa y asuntos todavía abiertos."
@@ -411,7 +420,7 @@ function InicioPage() {
             </section>
           )}
 
-        <section data-guia="continuar-trabajo">
+        <section data-guia="continuar-trabajo" className="hidden">
           <EncabezadoSeccion
             titulo={
               esEvaluador ? 'Revisiones accesibles' : 'Continúa trabajando'
@@ -516,6 +525,122 @@ function Indicador({
   )
 }
 
+function WorkspaceProgress({ workspace }: { workspace: WorkspaceContext }) {
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const dashboard = buildWorkspaceDashboard(workspace)
+  const selectedGroup = dashboard.grupos.find(
+    (group) => group.id === selectedGroupId,
+  )
+  const esProfesor = workspace.estacion === 'CourseWorkspace'
+
+  return (
+    <section
+      aria-label="Avance del trabajo"
+      className="border-primary/25 bg-primary/5 gap-seccion p-seccion flex flex-col border-y"
+    >
+      <div className="gap-control flex items-end justify-between">
+        <div>
+          <p className="text-primary text-sm font-semibold">
+            Avance de tu trabajo
+          </p>
+          <p className="mt-micro text-4xl font-bold tabular-nums">
+            {dashboard.porcentaje}%
+          </p>
+        </div>
+        <p className="text-muted-foreground text-right text-sm tabular-nums">
+          {dashboard.completadas} completos
+          <br />
+          {dashboard.pendientes} pendientes
+        </p>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="Avance del trabajo accionable"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={dashboard.porcentaje}
+        className="bg-muted h-3 overflow-hidden rounded-full"
+      >
+        <div
+          className="bg-primary h-full rounded-full"
+          style={{ width: `${dashboard.porcentaje}%` }}
+        />
+      </div>
+      {dashboard.grupos.length > 0 && (
+        <div className="gap-control grid">
+          <p className="text-muted-foreground text-xs font-medium">
+            {esProfesor ? 'Avance por plan' : 'Avance por carrera'}
+          </p>
+          {dashboard.grupos.slice(0, 4).map((group) => (
+            <Button
+              key={group.id}
+              type="button"
+              variant="ghost"
+              className="organic-interactive h-auto w-full justify-start p-0 text-left whitespace-normal"
+              onClick={() => setSelectedGroupId(group.id)}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="gap-control flex items-center justify-between text-sm">
+                  <span className="truncate font-medium">{group.etiqueta}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {group.porcentaje}%
+                  </span>
+                </span>
+                <span className="bg-muted mt-micro block h-1.5 overflow-hidden rounded-full">
+                  <span
+                    className="bg-primary block h-full rounded-full"
+                    style={{ width: `${group.porcentaje}%` }}
+                  />
+                </span>
+              </span>
+            </Button>
+          ))}
+        </div>
+      )}
+      <WorkspaceSelectionDialog
+        open={selectedGroup !== undefined}
+        onOpenChange={(open) => !open && setSelectedGroupId(null)}
+        titulo={selectedGroup?.etiqueta ?? 'Avance'}
+        descripcion="Selecciona el elemento que deseas continuar."
+      >
+        <div className="divide-y">
+          {esProfesor
+            ? workspace.asignaturas
+                .filter((asignatura) => asignatura.planId === selectedGroup?.id)
+                .map((asignatura) => (
+                  <WorkspaceSubjectOption
+                    key={asignatura.id}
+                    asignatura={asignatura}
+                  />
+                ))
+            : workspace.planes
+                .filter((plan) => plan.carreraId === selectedGroup?.id)
+                .map((plan) => (
+                  <Link
+                    key={plan.id}
+                    to="/planes/$planId/asignaturas"
+                    params={{ planId: plan.id }}
+                    search={defaultAsignaturasSearch}
+                    className="organic-interactive gap-grupo py-control flex items-center justify-between"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold">
+                        {plan.nombre}
+                      </span>
+                      <span className="text-muted-foreground mt-micro block text-sm">
+                        {plan.asignaturasCompletas} de {plan.asignaturasTotal}{' '}
+                        asignaturas completas
+                      </span>
+                    </span>
+                    <ArrowRight className="text-muted-foreground size-5 shrink-0" />
+                  </Link>
+                ))}
+        </div>
+      </WorkspaceSelectionDialog>
+    </section>
+  )
+}
+
 function WorkspacePriority({ workspace }: { workspace: WorkspaceContext }) {
   const action = workspace.accionesPendientes.at(0)
   return (
@@ -579,6 +704,58 @@ function WorkspaceActionButton({
     )
   }
 
+  const subjectRouteMatch = action.ruta.match(
+    /^\/planes\/([^/]+)\/asignaturas\/([^/]+)(?:\/(contenido|evaluacion))?$/,
+  )
+  if (subjectRouteMatch?.[3] === 'contenido') {
+    return (
+      <Button asChild className="shrink-0">
+        <Link
+          to="/planes/$planId/asignaturas/$asignaturaId/contenido"
+          params={{
+            planId: subjectRouteMatch[1],
+            asignaturaId: subjectRouteMatch[2],
+          }}
+        >
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+  if (subjectRouteMatch?.[3] === 'evaluacion') {
+    return (
+      <Button asChild className="shrink-0">
+        <Link
+          to="/planes/$planId/asignaturas/$asignaturaId/evaluacion"
+          params={{
+            planId: subjectRouteMatch[1],
+            asignaturaId: subjectRouteMatch[2],
+          }}
+        >
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+  if (subjectRouteMatch) {
+    return (
+      <Button asChild className="shrink-0">
+        <Link
+          to="/planes/$planId/asignaturas/$asignaturaId"
+          params={{
+            planId: subjectRouteMatch[1],
+            asignaturaId: subjectRouteMatch[2],
+          }}
+        >
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+
   const assignment = workspace.asignaturas.find((item) =>
     action.ruta.includes(`/asignaturas/${item.id}`),
   )
@@ -630,6 +807,10 @@ function WorkspacePendingActions({
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const groups = groupPendingActions(workspace.accionesPendientes)
   const selectedGroup = groups.find((group) => group.id === selectedGroupId)
+  const selectedPlanGroups = groupActionsByPlan(
+    selectedGroup?.actions ?? [],
+    workspace.planes,
+  )
   if (workspace.accionesPendientes.length < 2) return null
 
   return (
@@ -674,29 +855,55 @@ function WorkspacePendingActions({
         open={selectedGroup !== undefined}
         onOpenChange={(open) => !open && setSelectedGroupId(null)}
         titulo={selectedGroup?.titulo ?? 'Pendientes'}
-        descripcion="Selecciona el elemento que deseas atender."
+        descripcion="Los pendientes están separados por plan."
       >
-        {selectedGroup && (
-          <div className="divide-y">
-            {selectedGroup.actions.map((action) => (
-              <div
-                key={action.id}
-                className="gap-grupo py-control flex items-center justify-between"
-              >
+        {selectedGroup &&
+          selectedPlanGroups.map((planGroup) => (
+            <section key={planGroup.id} className="py-control">
+              <div className="gap-relacionado mb-relacionado pb-relacionado flex items-center justify-between border-b">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">{action.titulo}</p>
-                  <p className="text-muted-foreground mt-micro truncate text-sm">
-                    {action.detalle}
-                  </p>
+                  {planGroup.planId && planGroup.planId !== 'nuevo' ? (
+                    <Link
+                      to="/planes/$planId"
+                      params={{ planId: planGroup.planId }}
+                      className="hover:text-primary font-semibold"
+                    >
+                      {planGroup.planNombre}
+                    </Link>
+                  ) : (
+                    <h3 className="font-semibold">{planGroup.planNombre}</h3>
+                  )}
+                  {planGroup.carreraNombre && (
+                    <p className="text-muted-foreground mt-micro truncate text-xs">
+                      {planGroup.carreraNombre}
+                    </p>
+                  )}
                 </div>
-                <WorkspaceActionButton
-                  workspace={workspace}
-                  action={{ etiqueta: 'Abrir', ruta: action.ruta }}
-                />
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {planGroup.acciones.length} pendientes
+                </span>
               </div>
-            ))}
-          </div>
-        )}
+              <div className="divide-y">
+                {planGroup.acciones.map((action) => (
+                  <div
+                    key={action.id}
+                    className="gap-grupo py-control flex items-center justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{action.titulo}</p>
+                      <p className="text-muted-foreground mt-micro truncate text-sm">
+                        {action.detalle}
+                      </p>
+                    </div>
+                    <WorkspaceActionButton
+                      workspace={workspace}
+                      action={{ etiqueta: 'Abrir', ruta: action.ruta }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
       </WorkspaceSelectionDialog>
     </section>
   )
@@ -741,7 +948,7 @@ function groupPendingActions(actions: Array<WorkspaceAction>) {
   const severityRank = { CRITICA: 0, ALTA: 1, MEDIA: 2, BAJA: 3 }
 
   for (const action of actions) {
-    const titulo = action.detalle?.trim() || action.tipo
+    const titulo = action.detalle.trim() || action.tipo
     const id = `${action.tipo}:${titulo}`
     const group = groups.get(id)
     if (group) {
@@ -792,8 +999,11 @@ function groupWorkspacePlans(plans: Array<WorkspacePlan>) {
 }
 
 function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {
+  const indicatorsWithFindings = workspace.indicadores.filter(
+    (indicator) => indicator.valor > 0,
+  )
   const hasOverview =
-    workspace.indicadores.length > 0 || workspace.planes.length > 0
+    indicatorsWithFindings.length > 0 || workspace.planes.length > 0
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const planGroups = groupWorkspacePlans(workspace.planes)
   const selectedGroup = planGroups.find((group) => group.id === selectedGroupId)
@@ -805,9 +1015,9 @@ function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {
         titulo="Estado del trabajo"
         descripcion="Indicadores y agrupaciones para priorizar el siguiente paso."
       />
-      {workspace.indicadores.length > 0 && (
+      {indicatorsWithFindings.length > 0 && (
         <div className="mt-seccion gap-grupo grid sm:grid-cols-2 xl:grid-cols-4">
-          {workspace.indicadores.map((indicator) => (
+          {indicatorsWithFindings.map((indicator) => (
             <div
               key={indicator.id}
               className="border-border gap-grupo py-seccion flex items-start border-y"
@@ -902,6 +1112,7 @@ function WorkspaceOverview({ workspace }: { workspace: WorkspaceContext }) {
 
 function WorkspaceSubjects({ workspace }: { workspace: WorkspaceContext }) {
   const [selectorOpen, setSelectorOpen] = useState(false)
+  const planGroups = groupSubjectsByPlan(workspace.asignaturas)
   if (workspace.asignaturas.length === 0) {
     return (
       <section className="border-border gap-grupo py-region flex items-center border-y">
@@ -956,14 +1167,35 @@ function WorkspaceSubjects({ workspace }: { workspace: WorkspaceContext }) {
         titulo="Asignaturas a mi cargo"
         descripcion="Selecciona una asignatura para abrir su espacio de trabajo."
       >
-        <div className="divide-y">
-          {workspace.asignaturas.map((asignatura) => (
-            <WorkspaceSubjectOption
-              key={asignatura.id}
-              asignatura={asignatura}
-            />
-          ))}
-        </div>
+        {planGroups.map((group) => (
+          <section key={group.id} className="py-control">
+            <div className="gap-relacionado mb-relacionado pb-relacionado flex items-center justify-between border-b">
+              <div className="min-w-0">
+                <Link
+                  to="/planes/$planId"
+                  params={{ planId: group.planId }}
+                  className="hover:text-primary font-semibold"
+                >
+                  {group.planNombre}
+                </Link>
+                <p className="text-muted-foreground mt-micro truncate text-xs">
+                  {group.carreraNombre}
+                </p>
+              </div>
+              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                {group.asignaturas.length} asignaturas
+              </span>
+            </div>
+            <div className="divide-y">
+              {group.asignaturas.map((asignatura) => (
+                <WorkspaceSubjectOption
+                  key={asignatura.id}
+                  asignatura={asignatura}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </WorkspaceSelectionDialog>
     </section>
   )

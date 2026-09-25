@@ -12,12 +12,7 @@ export type WorkspaceStation =
   | 'ExternalReviewWorkspace'
 
 export type WorkspaceEntityType =
-  | 'institucion'
-  | 'facultad'
-  | 'carrera'
-  | 'plan'
-  | 'asignatura'
-  | 'tarea'
+  'institucion' | 'facultad' | 'carrera' | 'plan' | 'asignatura' | 'tarea'
 
 export type WorkspaceSeverity = 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAJA'
 
@@ -78,6 +73,8 @@ export type WorkspaceFinding = {
 export type WorkspaceAction = WorkspaceFinding & {
   tipo: 'PENDIENTE' | 'REVISION' | 'BLOQUEO' | 'TAREA'
   planId?: string
+  planNombre?: string | null
+  carreraNombre?: string | null
   asignaturaId?: string
   fechaLimite?: string | null
 }
@@ -91,6 +88,13 @@ export type WorkspaceIndicator = {
   nivelDrilldown: number
   ruta: string
   severidad?: WorkspaceSeverity
+}
+
+export type WorkspaceProgress = {
+  completadas: number
+  pendientes: number
+  total: number
+  porcentaje: number
 }
 
 export type WorkspaceContext = {
@@ -112,4 +116,5 @@ export type WorkspaceContext = {
   asignaturas: Array<WorkspaceAsignatura>
   accionesPendientes: Array<WorkspaceAction>
   indicadores: Array<WorkspaceIndicator>
+  progreso: WorkspaceProgress
 }
