@@ -37,6 +37,7 @@ import {
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { RouteTabLink, RouteTabs } from '@/components/shared/RouteTabs'
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import {
   Dialog,
   DialogContent,
@@ -55,7 +56,6 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import {
   Tooltip,
   TooltipContent,
@@ -107,8 +107,8 @@ import { formatCiclo, nombreTipoCiclo, sinCicloLabel } from '@/lib/ciclo-utils'
 import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
-import { cn } from '@/lib/utils'
 import { notify } from '@/lib/toast'
+import { cn } from '@/lib/utils'
 import { IaPlanChatView } from '@/routes/planes/$planId/_detalle/iaplan'
 import {
   defaultPlanDetalleSearch,
