@@ -944,7 +944,7 @@ function WorkspacePendingActions({
                     <Link
                       to="/planes/$planId"
                       params={{ planId: planGroup.planId }}
-                      className="text-primary mb-control inline-flex items-center gap-1 text-xs hover:underline"
+                      className="text-primary mb-control inline-flex items-center gap-micro text-xs hover:underline"
                     >
                       Ver plan <ArrowRight className="size-3" />
                     </Link>

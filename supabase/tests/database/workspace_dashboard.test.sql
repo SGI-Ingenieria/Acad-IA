@@ -18,7 +18,7 @@ SELECT has_function(
 
 SELECT ok(
   pg_get_functiondef('public.inicio_workspace_dashboard_base(text,uuid,uuid)'::regprocedure)
-    LIKE '%''progreso''%',
+    LIKE '%{progreso}%',
   'la RPC expone el progreso accionable'
 );
 
