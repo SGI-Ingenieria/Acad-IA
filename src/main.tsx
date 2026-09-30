@@ -116,7 +116,8 @@ declare module '@tanstack/react-router' {
   }
   interface HistoryState {
     showConfetti?: boolean
-    reopenContextualPanel?: 'plan-ia' | 'subject-ia'
+    reopenContextualPanel?:
+      'plan-ia' | 'subject-ia' | 'subject-responsables' | 'subject-revision'
   }
 }
 

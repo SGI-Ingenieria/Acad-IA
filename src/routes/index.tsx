@@ -25,6 +25,12 @@ import type {
   WorkspacePlan,
 } from '@/features/workspace/types'
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -603,7 +609,7 @@ function WorkspaceProgress({ workspace }: { workspace: WorkspaceContext }) {
         titulo={selectedGroup?.etiqueta ?? 'Avance'}
         descripcion="Selecciona el elemento que deseas continuar."
       >
-        <div className="divide-y">
+        <Accordion type="multiple" className="divide-y">
           {esProfesor
             ? workspace.asignaturas
                 .filter((asignatura) => asignatura.planId === selectedGroup?.id)
@@ -616,26 +622,46 @@ function WorkspaceProgress({ workspace }: { workspace: WorkspaceContext }) {
             : workspace.planes
                 .filter((plan) => plan.carreraId === selectedGroup?.id)
                 .map((plan) => (
-                  <Link
-                    key={plan.id}
-                    to="/planes/$planId/asignaturas"
-                    params={{ planId: plan.id }}
-                    search={defaultAsignaturasSearch}
-                    className="organic-interactive gap-grupo py-control flex items-center justify-between"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate font-semibold">
-                        {plan.nombre}
+                  <AccordionItem key={plan.id} value={plan.id}>
+                    <AccordionTrigger>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">
+                          {plan.nombre}
+                        </span>
+                        <span className="text-muted-foreground mt-micro block text-sm">
+                          {plan.asignaturasCompletas} de {plan.asignaturasTotal}{' '}
+                          asignaturas completas
+                        </span>
                       </span>
-                      <span className="text-muted-foreground mt-micro block text-sm">
-                        {plan.asignaturasCompletas} de {plan.asignaturasTotal}{' '}
-                        asignaturas completas
-                      </span>
-                    </span>
-                    <ArrowRight className="text-muted-foreground size-5 shrink-0" />
-                  </Link>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="divide-y">
+                        {workspace.asignaturas
+                          .filter((asignatura) => asignatura.planId === plan.id)
+                          .map((asignatura) => (
+                            <WorkspaceSubjectOption
+                              key={asignatura.id}
+                              asignatura={asignatura}
+                            />
+                          ))}
+                      </div>
+                      {workspace.asignaturas.every(
+                        (asignatura) => asignatura.planId !== plan.id,
+                      ) && (
+                        <Link
+                          to="/planes/$planId/asignaturas"
+                          params={{ planId: plan.id }}
+                          search={defaultAsignaturasSearch}
+                          className="organic-interactive gap-grupo py-control flex items-center justify-between"
+                        >
+                          <span>Ver asignaturas del plan</span>
+                          <ArrowRight className="text-muted-foreground size-5 shrink-0" />
+                        </Link>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
                 ))}
-        </div>
+        </Accordion>
       </WorkspaceSelectionDialog>
     </section>
   )
@@ -669,7 +695,14 @@ function WorkspacePriority({ workspace }: { workspace: WorkspaceContext }) {
       </div>
       {workspace.accionPrincipal && (
         <WorkspaceActionButton
-          action={workspace.accionPrincipal}
+          action={{
+            ...workspace.accionPrincipal,
+            contextualPanel: getWorkspaceActionPanel(
+              workspace.accionesPendientes.find(
+                (pending) => pending.ruta === workspace.accionPrincipal?.ruta,
+              ),
+            ),
+          }}
           workspace={workspace}
         />
       )}
@@ -681,7 +714,9 @@ function WorkspaceActionButton({
   action,
   workspace,
 }: {
-  action: NonNullable<WorkspaceContext['accionPrincipal']>
+  action: NonNullable<WorkspaceContext['accionPrincipal']> & {
+    contextualPanel?: 'responsables' | 'revision'
+  }
   workspace: WorkspaceContext
 }) {
   const responsibilityMatch = action.ruta.match(
@@ -691,11 +726,12 @@ function WorkspaceActionButton({
     return (
       <Button asChild className="shrink-0">
         <Link
-          to="/planes/$planId/asignaturas/$asignaturaId/responsables"
+          to="/planes/$planId/asignaturas/$asignaturaId"
           params={{
             planId: responsibilityMatch[1],
             asignaturaId: responsibilityMatch[2],
           }}
+          state={{ reopenContextualPanel: 'subject-responsables' }}
         >
           {action.etiqueta}
           <ArrowRight />
@@ -748,6 +784,11 @@ function WorkspaceActionButton({
             planId: subjectRouteMatch[1],
             asignaturaId: subjectRouteMatch[2],
           }}
+          state={
+            action.contextualPanel === 'revision'
+              ? { reopenContextualPanel: 'subject-revision' }
+              : undefined
+          }
         >
           {action.etiqueta}
           <ArrowRight />
@@ -766,6 +807,18 @@ function WorkspaceActionButton({
           to="/planes/$planId/asignaturas/$asignaturaId"
           params={{ planId: assignment.planId, asignaturaId: assignment.id }}
         >
+          {action.etiqueta}
+          <ArrowRight />
+        </Link>
+      </Button>
+    )
+  }
+
+  const mapRouteMatch = action.ruta.match(/^\/planes\/([^/]+)\/mapa$/)
+  if (mapRouteMatch) {
+    return (
+      <Button asChild className="shrink-0">
+        <Link to="/planes/$planId/mapa" params={{ planId: mapRouteMatch[1] }}>
           {action.etiqueta}
           <ArrowRight />
         </Link>
@@ -797,6 +850,19 @@ function WorkspaceActionButton({
   }
 
   return null
+}
+
+function getWorkspaceActionPanel(
+  action: WorkspaceAction | undefined,
+): 'responsables' | 'revision' | undefined {
+  if (action?.ruta.endsWith('/responsables')) return 'responsables'
+  if (
+    action &&
+    action.detalle.toLocaleLowerCase('es').includes('sigue en borrador')
+  ) {
+    return 'revision'
+  }
+  return undefined
 }
 
 function WorkspacePendingActions({
@@ -857,53 +923,57 @@ function WorkspacePendingActions({
         titulo={selectedGroup?.titulo ?? 'Pendientes'}
         descripcion="Los pendientes están separados por plan."
       >
-        {selectedGroup &&
-          selectedPlanGroups.map((planGroup) => (
-            <section key={planGroup.id} className="py-control">
-              <div className="gap-relacionado mb-relacionado pb-relacionado flex items-center justify-between border-b">
-                <div className="min-w-0">
-                  {planGroup.planId && planGroup.planId !== 'nuevo' ? (
+        {selectedGroup && (
+          <Accordion type="multiple" className="divide-y">
+            {selectedPlanGroups.map((planGroup) => (
+              <AccordionItem key={planGroup.id} value={planGroup.id}>
+                <AccordionTrigger>
+                  <span className="min-w-0">
+                    <span className="block font-semibold">
+                      {planGroup.planNombre}
+                    </span>
+                    {planGroup.carreraNombre && (
+                      <span className="text-muted-foreground mt-micro block truncate text-xs">
+                        {planGroup.carreraNombre}
+                      </span>
+                    )}
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {planGroup.planId && planGroup.planId !== 'nuevo' && (
                     <Link
                       to="/planes/$planId"
                       params={{ planId: planGroup.planId }}
-                      className="hover:text-primary font-semibold"
+                      className="text-primary mb-control inline-flex items-center gap-1 text-xs hover:underline"
                     >
-                      {planGroup.planNombre}
+                      Ver plan <ArrowRight className="size-3" />
                     </Link>
-                  ) : (
-                    <h3 className="font-semibold">{planGroup.planNombre}</h3>
                   )}
-                  {planGroup.carreraNombre && (
-                    <p className="text-muted-foreground mt-micro truncate text-xs">
-                      {planGroup.carreraNombre}
-                    </p>
-                  )}
-                </div>
-                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                  {planGroup.acciones.length} pendientes
-                </span>
-              </div>
-              <div className="divide-y">
-                {planGroup.acciones.map((action) => (
-                  <div
-                    key={action.id}
-                    className="gap-grupo py-control flex items-center justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{action.titulo}</p>
-                      <p className="text-muted-foreground mt-micro truncate text-sm">
-                        {action.detalle}
-                      </p>
-                    </div>
-                    <WorkspaceActionButton
-                      workspace={workspace}
-                      action={{ etiqueta: 'Abrir', ruta: action.ruta }}
-                    />
+                  <div className="divide-y">
+                    {planGroup.acciones.map((action) => (
+                      <div
+                        key={action.id}
+                        className="gap-grupo py-control flex items-center justify-between"
+                      >
+                        <p className="min-w-0 truncate font-medium">
+                          {action.titulo}
+                        </p>
+                        <WorkspaceActionButton
+                          workspace={workspace}
+                          action={{
+                            etiqueta: 'Abrir',
+                            ruta: action.ruta,
+                            contextualPanel: getWorkspaceActionPanel(action),
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </section>
-          ))}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
       </WorkspaceSelectionDialog>
     </section>
   )
@@ -926,7 +996,7 @@ function WorkspaceSelectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="grid max-h-[min(38rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)]">
         <DialogHeader>
-          <DialogTitle>{titulo}</DialogTitle>
+          <DialogTitle className="text-xl">{titulo}</DialogTitle>
           <DialogDescription>{descripcion}</DialogDescription>
         </DialogHeader>
         <DialogBody className="overflow-y-auto">{children}</DialogBody>
@@ -1167,35 +1237,35 @@ function WorkspaceSubjects({ workspace }: { workspace: WorkspaceContext }) {
         titulo="Asignaturas a mi cargo"
         descripcion="Selecciona una asignatura para abrir su espacio de trabajo."
       >
-        {planGroups.map((group) => (
-          <section key={group.id} className="py-control">
-            <div className="gap-relacionado mb-relacionado pb-relacionado flex items-center justify-between border-b">
-              <div className="min-w-0">
-                <Link
-                  to="/planes/$planId"
-                  params={{ planId: group.planId }}
-                  className="hover:text-primary font-semibold"
-                >
-                  {group.planNombre}
-                </Link>
-                <p className="text-muted-foreground mt-micro truncate text-xs">
-                  {group.carreraNombre}
-                </p>
-              </div>
-              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                {group.asignaturas.length} asignaturas
-              </span>
-            </div>
-            <div className="divide-y">
-              {group.asignaturas.map((asignatura) => (
-                <WorkspaceSubjectOption
-                  key={asignatura.id}
-                  asignatura={asignatura}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+        <Accordion type="multiple" className="divide-y">
+          {planGroups.map((group) => (
+            <AccordionItem key={group.id} value={group.id}>
+              <AccordionTrigger>
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold">
+                    {group.planNombre}
+                  </span>
+                  <span className="text-muted-foreground mt-micro block truncate text-xs">
+                    {group.carreraNombre}
+                  </span>
+                  <span className="text-muted-foreground mt-micro block text-xs tabular-nums">
+                    {group.asignaturas.length} asignaturas
+                  </span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="divide-y">
+                  {group.asignaturas.map((asignatura) => (
+                    <WorkspaceSubjectOption
+                      key={asignatura.id}
+                      asignatura={asignatura}
+                    />
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </WorkspaceSelectionDialog>
     </section>
   )
