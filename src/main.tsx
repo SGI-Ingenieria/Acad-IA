@@ -116,6 +116,7 @@ declare module '@tanstack/react-router' {
   }
   interface HistoryState {
     showConfetti?: boolean
+    scrollToMapaPendientes?: boolean
     reopenContextualPanel?:
       'plan-ia' | 'subject-ia' | 'subject-responsables' | 'subject-revision'
   }

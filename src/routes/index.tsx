@@ -818,7 +818,11 @@ function WorkspaceActionButton({
   if (mapRouteMatch) {
     return (
       <Button asChild className="shrink-0">
-        <Link to="/planes/$planId/mapa" params={{ planId: mapRouteMatch[1] }}>
+        <Link
+          to="/planes/$planId/mapa"
+          params={{ planId: mapRouteMatch[1] }}
+          state={{ scrollToMapaPendientes: true }}
+        >
           {action.etiqueta}
           <ArrowRight />
         </Link>
