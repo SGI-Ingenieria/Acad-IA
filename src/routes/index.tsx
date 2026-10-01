@@ -822,6 +822,7 @@ function WorkspaceActionButton({
           to="/planes/$planId/mapa"
           params={{ planId: mapRouteMatch[1] }}
           state={{ scrollToMapaPendientes: true }}
+          resetScroll={false}
         >
           {action.etiqueta}
           <ArrowRight />

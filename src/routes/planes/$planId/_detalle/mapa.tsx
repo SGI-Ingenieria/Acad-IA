@@ -405,11 +405,11 @@ function MapaCurricularPage() {
     if (!scrollToMapaPendientes || loadingAsig || loadingLineas) return
 
     const frame = window.requestAnimationFrame(() => {
-      window.scrollTo({
-        top: document.documentElement.scrollHeight,
+      contenedorMapaRef.current?.scrollIntoView({
         behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
           ? 'instant'
           : 'smooth',
+        block: 'end',
       })
     })
 
