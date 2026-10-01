@@ -104,12 +104,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { data: plan, error: planError } = await supabase
       .from('planes_estudio')
       .select(
-        'id, estado_actual_id, estructuras_plan!planes_estudio_estructura_id_fkey(tipo)',
+        'id, estado_actual_id, descartado_en, estructuras_plan!planes_estudio_estructura_id_fkey(tipo)',
       )
       .eq('id', planId)
       .maybeSingle()
     if (planError) throw new HttpError(500, planError.message, 'DB_ERROR')
     if (!plan) throw new HttpError(404, 'Plan no encontrado.', 'NOT_FOUND')
+    if (plan.descartado_en) {
+      throw new HttpError(
+        409,
+        'El plan fue descartado y está en modo solo lectura.',
+        'PLAN_DISCARDED',
+      )
+    }
 
     const tipoEstructura = (
       plan.estructuras_plan as unknown as { tipo: string } | null

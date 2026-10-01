@@ -1,4 +1,8 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  useNavigate,
+  useRouterState,
+} from '@tanstack/react-router'
 import {
   AlertTriangle,
   Calculator,
@@ -361,6 +365,9 @@ export const Route = createFileRoute('/planes/$planId/_detalle/mapa')({
 function MapaCurricularPage() {
   const { planId } = Route.useParams() // Idealmente usa el ID de la ruta
   const navigate = useNavigate({ from: Route.fullPath })
+  const scrollToMapaPendientes = useRouterState({
+    select: (state) => state.location.state.scrollToMapaPendientes,
+  })
   const { data } = usePlan(planId)
   const capabilities = usePlanCapabilities(data)
   const canEditMapa = capabilities.canEditAsignaturas
@@ -393,6 +400,21 @@ function MapaCurricularPage() {
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const contenedorMapaRef = useRef<HTMLDivElement>(null)
   const flipMapaRef = useRef<ReturnType<typeof Flip.getState> | null>(null)
+
+  useEffect(() => {
+    if (!scrollToMapaPendientes || loadingAsig || loadingLineas) return
+
+    const frame = window.requestAnimationFrame(() => {
+      contenedorMapaRef.current?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'instant'
+          : 'smooth',
+        block: 'end',
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [loadingAsig, loadingLineas, scrollToMapaPendientes])
 
   /**
    * Congela la posición actual de las tarjetas para animar el reacomodo que

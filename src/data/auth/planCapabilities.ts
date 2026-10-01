@@ -31,6 +31,8 @@ const WRITE_NORMAL_STATES = new Set(['BORRADOR', 'REVISION'])
 export type PlanCapabilities = {
   estadoClave: string | null
   isAntecedente: boolean
+  isDiscarded: boolean
+  canDiscardPlan: boolean
   isFrozenForEditing: boolean
   canEditPlan: boolean
   canEditAsignaturas: boolean
@@ -104,11 +106,14 @@ export function buildPlanCapabilities({
 }: BuildPlanCapabilitiesInput): PlanCapabilities {
   const estadoClave = plan?.estados_plan?.clave ?? null
   const isAntecedente = plan?.rol_version_plan === 'ANTECEDENTE'
+  const isDiscarded = Boolean(plan?.descartado_en)
 
   if (isAntecedente) {
     return {
       estadoClave,
       isAntecedente: true,
+      isDiscarded,
+      canDiscardPlan: false,
       isFrozenForEditing: true,
       canEditPlan: false,
       canEditAsignaturas: false,
@@ -164,22 +169,29 @@ export function buildPlanCapabilities({
           'EVALUADOR_EXTERNO',
         ]))
 
-  const isFrozenForEditing = !normalEdit
+  const isFrozenForEditing = isDiscarded || !normalEdit
 
   return {
     estadoClave,
     isAntecedente: false,
+    isDiscarded,
+    canDiscardPlan:
+      !isDiscarded &&
+      plan?.rol_version_plan === 'VERSION_TRABAJO' &&
+      normalEdit,
     isFrozenForEditing,
-    canEditPlan: canEdit,
-    canEditAsignaturas: canEdit,
-    canEditRestrictedFields: canEdit,
-    canComment,
-    canUseIA,
-    showIATabs,
+    canEditPlan: isDiscarded ? false : canEdit,
+    canEditAsignaturas: isDiscarded ? false : canEdit,
+    canEditRestrictedFields: isDiscarded ? false : canEdit,
+    canComment: isDiscarded ? false : canComment,
+    canUseIA: isDiscarded ? false : canUseIA,
+    showIATabs: isDiscarded ? false : showIATabs,
     requiresAdminOverrideForEdit: canEditWithOverride,
-    readOnlyReason: isFrozenForEditing
-      ? 'Este plan esta en modo solo lectura para tu rol y etapa actual.'
-      : null,
+    readOnlyReason: isDiscarded
+      ? 'Este plan fue descartado y archivado; solo está disponible para consulta.'
+      : isFrozenForEditing
+        ? 'Este plan esta en modo solo lectura para tu rol y etapa actual.'
+        : null,
   }
 }
 

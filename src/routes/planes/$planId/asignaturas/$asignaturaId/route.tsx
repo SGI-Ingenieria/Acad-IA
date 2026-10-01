@@ -117,11 +117,7 @@ import {
 } from '@/types/search'
 
 type SubjectContextualPanel =
-  | 'comentarios'
-  | 'ia'
-  | 'responsables'
-  | 'revision'
-  | 'historial'
+  'comentarios' | 'ia' | 'responsables' | 'revision' | 'historial'
 
 /**
  * Un usuario puede llegar a esta ruta viendo una asignatura a la que solo tiene
@@ -564,6 +560,12 @@ function AsignaturaLayout() {
     if (requestedContextualPanel === 'subject-ia') {
       closeComments()
       openContextualPanel('ia')
+    } else if (requestedContextualPanel === 'subject-responsables') {
+      closeComments()
+      openContextualPanel('responsables')
+    } else if (requestedContextualPanel === 'subject-revision') {
+      closeComments()
+      openContextualPanel('revision')
     }
   }, [closeComments, openContextualPanel, requestedContextualPanel])
 

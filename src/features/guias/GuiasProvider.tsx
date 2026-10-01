@@ -346,6 +346,9 @@ export function GuiasProvider() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const scrollToMapaPendientes = useRouterState({
+    select: (state) => state.location.state.scrollToMapaPendientes,
+  })
   const guia = useMemo(() => guiaParaRuta(pathname), [pathname])
   const progreso = useProgresoGuia(
     guia?.clave ?? 'sin-guia',
@@ -441,7 +444,7 @@ export function GuiasProvider() {
     window.addEventListener(INICIAR_GUIA_EVENT, listener)
     const key = `${guia.clave}:${GUIA_VERSION}`
     const timeout =
-      iniciada.current === key
+      scrollToMapaPendientes || iniciada.current === key
         ? undefined
         : window.setTimeout(() => {
             iniciada.current = key
@@ -453,7 +456,7 @@ export function GuiasProvider() {
       if (timeout) window.clearTimeout(timeout)
       destruirRecorrido()
     }
-  }, [guardar, guia, progreso.data, progreso.isLoading])
+  }, [guardar, guia, progreso.data, progreso.isLoading, scrollToMapaPendientes])
 
   return null
 }
