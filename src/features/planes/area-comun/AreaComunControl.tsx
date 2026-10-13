@@ -879,7 +879,7 @@ export function AreaComunInicio() {
       {prioridad && (
         <section className="border-border gap-grupo px-seccion py-grupo flex flex-wrap items-center justify-between border-y">
           <div className="gap-grupo flex items-start">
-            <prioridad.icono className="text-primary mt-1 size-5" />
+            <prioridad.icono className="text-primary mt-micro size-5" />
             <div>
               <p className="text-primary text-sm font-medium">
                 Tu prioridad ahora
