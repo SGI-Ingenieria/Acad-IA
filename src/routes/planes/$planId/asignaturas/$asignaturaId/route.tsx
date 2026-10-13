@@ -88,6 +88,7 @@ import {
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { useAreaComunRealtime } from '@/data/hooks/useAreaComun'
 import { useSession } from '@/data/hooks/useAuth'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
@@ -522,6 +523,7 @@ function AsignaturaLayout() {
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
   const { origen, soloAsignatura } = Route.useSearch()
+  useAreaComunRealtime(planId)
   const { data: plan } = usePlan(planId)
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditAsignatura = capabilities.canEditAsignaturas
@@ -843,6 +845,11 @@ function AsignaturaLayout() {
           )}
 
           <div className="gap-grupo flex flex-col">
+            {asignaturaApi.area_comun_origen_id && (
+              <p className="text-muted-foreground text-sm">
+                Área común · Contenido publicado de solo lectura
+              </p>
+            )}
             {/* Título Editable (Texto blanco controlado dentro del componente) */}
             <div className="-ml-relacionado">
               <InlineEditTitle

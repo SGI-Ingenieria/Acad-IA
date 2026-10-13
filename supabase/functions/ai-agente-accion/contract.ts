@@ -49,6 +49,7 @@ const MejorarCampoSchema = z
 
 const LineaMapaSchema = z
   .object({
+    solo_lectura: z.boolean().optional(),
     id: UUID,
     nombre: z.string(),
     orden: z.number().int(),
@@ -57,6 +58,7 @@ const LineaMapaSchema = z
 
 const AsignaturaMapaSchema = z
   .object({
+    solo_lectura: z.boolean().optional(),
     id: UUID,
     nombre: z.string(),
     clave: z.string().nullable(),

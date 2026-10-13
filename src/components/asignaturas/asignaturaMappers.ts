@@ -3,6 +3,7 @@ import type { Tables } from '@/types/supabase'
 
 export const mapAsignaturaRow = (asig: Tables<'asignaturas'>): Asignatura => ({
   id: asig.id,
+  areaComunOrigenId: asig.area_comun_origen_id,
   clave: asig.codigo ?? '',
   nombre: asig.nombre,
   creditos: asig.creditos ?? 0,

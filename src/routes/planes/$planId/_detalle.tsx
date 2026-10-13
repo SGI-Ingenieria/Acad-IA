@@ -67,6 +67,7 @@ import {
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { useAreaComunRealtime } from '@/data/hooks/useAreaComun'
 import { useSession } from '@/data/hooks/useAuth'
 import { useLinajePlan } from '@/data/hooks/useImportacionesAcademicas'
 import { usePermissions } from '@/data/hooks/usePermissions'
@@ -93,6 +94,7 @@ import {
   useCommentsRead,
 } from '@/features/comentarios/hooks/useCommentsRead'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
+import { AreaComunPlanesUsuarios } from '@/features/planes/area-comun/AreaComunControl'
 import { PlanFlowPanel } from '@/features/planes/PlanFlowPanel'
 import { PlanHistoryPanel } from '@/features/planes/PlanHistoryPanel'
 import { TransicionEstadoDialog } from '@/features/planes/TransicionEstadoDialog'
@@ -185,6 +187,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
+  useAreaComunRealtime(planId)
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const discardPlan = useDiscardPlanEstudio()
@@ -688,6 +691,9 @@ function RouteComponent() {
           data-comment-key={planId}
         >
           <Outlet />
+          {data?.categoria === 'AREA_COMUN' && (
+            <AreaComunPlanesUsuarios planId={planId} />
+          )}
         </main>
 
         <PlanCommentsManager

@@ -144,7 +144,8 @@ type CatalogRole = {
   id: string
   clave: string
   nivel_jerarquico: number
-  alcance_default: 'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo'
+  alcance_default:
+    'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo' | 'area_comun'
 }
 
 type CatalogFacultad = {

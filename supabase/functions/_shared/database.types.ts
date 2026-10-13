@@ -20,8 +20,7 @@ export type Database = {
           id: string
           message_id: string | null
           message_type:
-            | Database['public']['Enums']['tipo_conversacion_documental']
-            | null
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
           mode: string
           request_id: string
           retrieval_query: string | null
@@ -38,8 +37,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           message_type?:
-            | Database['public']['Enums']['tipo_conversacion_documental']
-            | null
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
           mode: string
           request_id: string
           retrieval_query?: string | null
@@ -56,8 +54,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           message_type?:
-            | Database['public']['Enums']['tipo_conversacion_documental']
-            | null
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
           mode?: string
           request_id?: string
           retrieval_query?: string | null
@@ -120,6 +117,222 @@ export type Database = {
           {
             foreignKeyName: 'archivos_creado_por_fkey'
             columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      area_comun_configuracion: {
+        Row: {
+          actualizado_en: string
+          borrador: Json
+          plan_id: string
+          publicacion_id: string | null
+          revision: number
+        }
+        Insert: {
+          actualizado_en?: string
+          borrador?: Json
+          plan_id: string
+          publicacion_id?: string | null
+          revision?: number
+        }
+        Update: {
+          actualizado_en?: string
+          borrador?: Json
+          plan_id?: string
+          publicacion_id?: string | null
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'area_comun_configuracion_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: true
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_configuracion_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: true
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+          {
+            foreignKeyName: 'area_comun_configuracion_publicacion_id_fkey'
+            columns: ['publicacion_id']
+            isOneToOne: false
+            referencedRelation: 'area_comun_publicaciones'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      area_comun_historial: {
+        Row: {
+          accion: string
+          creado_en: string
+          detalle: Json
+          id: string
+          plan_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          accion: string
+          creado_en?: string
+          detalle?: Json
+          id?: string
+          plan_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          accion?: string
+          creado_en?: string
+          detalle?: Json
+          id?: string
+          plan_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'area_comun_historial_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_historial_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+          {
+            foreignKeyName: 'area_comun_historial_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      area_comun_incorporaciones: {
+        Row: {
+          actualizado_en: string
+          creado_en: string
+          creado_por: string | null
+          distribucion_clave: string
+          electivas: Json
+          id: string
+          linea_id: string
+          plan_id: string
+          publicacion_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          creado_en?: string
+          creado_por?: string | null
+          distribucion_clave: string
+          electivas?: Json
+          id?: string
+          linea_id: string
+          plan_id: string
+          publicacion_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          creado_en?: string
+          creado_por?: string | null
+          distribucion_clave?: string
+          electivas?: Json
+          id?: string
+          linea_id?: string
+          plan_id?: string
+          publicacion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'area_comun_incorporaciones_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_incorporaciones_linea_id_fkey'
+            columns: ['linea_id']
+            isOneToOne: true
+            referencedRelation: 'lineas_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_incorporaciones_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: true
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_incorporaciones_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: true
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+          {
+            foreignKeyName: 'area_comun_incorporaciones_publicacion_id_fkey'
+            columns: ['publicacion_id']
+            isOneToOne: false
+            referencedRelation: 'area_comun_publicaciones'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      area_comun_publicaciones: {
+        Row: {
+          contenido: Json
+          id: string
+          numero: number
+          plan_id: string
+          publicado_en: string
+          publicado_por: string | null
+        }
+        Insert: {
+          contenido: Json
+          id?: string
+          numero: number
+          plan_id: string
+          publicado_en?: string
+          publicado_por?: string | null
+        }
+        Update: {
+          contenido?: Json
+          id?: string
+          numero?: number
+          plan_id?: string
+          publicado_en?: string
+          publicado_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'area_comun_publicaciones_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_publicaciones_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+          {
+            foreignKeyName: 'area_comun_publicaciones_publicado_por_fkey'
+            columns: ['publicado_por']
             isOneToOne: false
             referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
@@ -210,6 +423,9 @@ export type Database = {
         Row: {
           actualizado_en: string
           actualizado_por: string | null
+          area_comun_espacio: string | null
+          area_comun_incorporacion_id: string | null
+          area_comun_origen_id: string | null
           asignatura_hash: string | null
           codigo: string | null
           contenido_tematico: Json
@@ -238,6 +454,9 @@ export type Database = {
         Insert: {
           actualizado_en?: string
           actualizado_por?: string | null
+          area_comun_espacio?: string | null
+          area_comun_incorporacion_id?: string | null
+          area_comun_origen_id?: string | null
           asignatura_hash?: string | null
           codigo?: string | null
           contenido_tematico?: Json
@@ -266,6 +485,9 @@ export type Database = {
         Update: {
           actualizado_en?: string
           actualizado_por?: string | null
+          area_comun_espacio?: string | null
+          area_comun_incorporacion_id?: string | null
+          area_comun_origen_id?: string | null
           asignatura_hash?: string | null
           codigo?: string | null
           contenido_tematico?: Json
@@ -298,6 +520,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'asignaturas_area_comun_incorporacion_id_fkey'
+            columns: ['area_comun_incorporacion_id']
+            isOneToOne: false
+            referencedRelation: 'area_comun_incorporaciones'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'asignaturas_area_comun_origen_id_fkey'
+            columns: ['area_comun_origen_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'asignaturas_area_comun_origen_id_fkey'
+            columns: ['area_comun_origen_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
           },
           {
             foreignKeyName: 'asignaturas_creado_por_fkey'
@@ -2384,8 +2627,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         Insert: {
           confianza?: number | null
@@ -2396,8 +2638,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado?:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         Update: {
           confianza?: number | null
@@ -2408,8 +2649,7 @@ export type Database = {
           importacion_id?: string
           rol?: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado?:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         Relationships: [
           {
@@ -3505,10 +3745,13 @@ export type Database = {
           activo: boolean
           actualizado_en: string
           actualizado_por: string | null
-          carrera_id: string
+          carrera_id: string | null
+          categoria: string
           creado_en: string
           creado_por: string | null
           datos: Json
+          descartado_en: string | null
+          descartado_por: string | null
           estado_actual_id: string | null
           estructura_id: string
           estructura_recomendada_id: string | null
@@ -3536,10 +3779,13 @@ export type Database = {
           activo?: boolean
           actualizado_en?: string
           actualizado_por?: string | null
-          carrera_id: string
+          carrera_id?: string | null
+          categoria?: string
           creado_en?: string
           creado_por?: string | null
           datos?: Json
+          descartado_en?: string | null
+          descartado_por?: string | null
           estado_actual_id?: string | null
           estructura_id: string
           estructura_recomendada_id?: string | null
@@ -3567,10 +3813,13 @@ export type Database = {
           activo?: boolean
           actualizado_en?: string
           actualizado_por?: string | null
-          carrera_id?: string
+          carrera_id?: string | null
+          categoria?: string
           creado_en?: string
           creado_por?: string | null
           datos?: Json
+          descartado_en?: string | null
+          descartado_por?: string | null
           estado_actual_id?: string | null
           estructura_id?: string
           estructura_recomendada_id?: string | null
@@ -3619,6 +3868,13 @@ export type Database = {
           {
             foreignKeyName: 'planes_estudio_creado_por_fkey'
             columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'planes_estudio_descartado_por_fkey'
+            columns: ['descartado_por']
             isOneToOne: false
             referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
@@ -4160,8 +4416,7 @@ export type Database = {
           id: string
           rol_permitido_id: string
           tipo_estructura:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Insert: {
           creado_en?: string
@@ -4170,8 +4425,7 @@ export type Database = {
           id?: string
           rol_permitido_id: string
           tipo_estructura?:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Update: {
           creado_en?: string
@@ -4180,8 +4434,7 @@ export type Database = {
           id?: string
           rol_permitido_id?: string
           tipo_estructura?:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Relationships: [
           {
@@ -4477,8 +4730,7 @@ export type Database = {
           autoridad: string | null
           carrera_id: string | null
           carrera_nivel:
-            | Database['public']['Enums']['nivel_plan_estudio']
-            | null
+            Database['public']['Enums']['nivel_plan_estudio'] | null
           carrera_nombre: string | null
           carrera_nombre_corto: string | null
           clave_sep: string | null
@@ -4592,10 +4844,13 @@ export type Database = {
           activo: boolean
           actualizado_en: string
           actualizado_por: string | null
-          carrera_id: string
+          carrera_id: string | null
+          categoria: string
           creado_en: string
           creado_por: string | null
           datos: Json
+          descartado_en: string | null
+          descartado_por: string | null
           estado_actual_id: string | null
           estructura_id: string
           estructura_recomendada_id: string | null
@@ -4640,8 +4895,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         SetofOptions: {
           from: '*'
@@ -4701,6 +4955,24 @@ export type Database = {
         Args: { p_append: Json; p_id: string }
         Returns: undefined
       }
+      area_comun_contexto: { Args: { p_plan_id: string }; Returns: Json }
+      area_comun_guardar_configuracion: {
+        Args: { p_distribuciones: Json; p_plan_id: string; p_revision: number }
+        Returns: number
+      }
+      area_comun_incorporar: {
+        Args: {
+          p_electivas?: Json
+          p_plan_id: string
+          p_publicacion_id?: string
+        }
+        Returns: string
+      }
+      area_comun_publicar: {
+        Args: { p_plan_id: string; p_revision: number }
+        Returns: string
+      }
+      area_comun_retirar: { Args: { p_plan_id: string }; Returns: undefined }
       authz_admin_override_audit: {
         Args: { p_plan_id: string }
         Returns: {
@@ -4894,6 +5166,9 @@ export type Database = {
         Returns: {
           actualizado_en: string
           actualizado_por: string | null
+          area_comun_espacio: string | null
+          area_comun_incorporacion_id: string | null
+          area_comun_origen_id: string | null
           asignatura_hash: string | null
           codigo: string | null
           contenido_tematico: Json
@@ -5079,10 +5354,13 @@ export type Database = {
           activo: boolean
           actualizado_en: string
           actualizado_por: string | null
-          carrera_id: string
+          carrera_id: string | null
+          categoria: string
           creado_en: string
           creado_por: string | null
           datos: Json
+          descartado_en: string | null
+          descartado_por: string | null
           estado_actual_id: string | null
           estructura_id: string
           estructura_recomendada_id: string | null
@@ -5299,6 +5577,38 @@ export type Database = {
         Returns: undefined
       }
       inicio_mesa_trabajo: {
+        Args: {
+          p_carrera_id?: string
+          p_facultad_id?: string
+          p_rol_clave?: string
+        }
+        Returns: Json
+      }
+      inicio_workspace: {
+        Args: {
+          p_carrera_id?: string
+          p_facultad_id?: string
+          p_rol_clave?: string
+        }
+        Returns: Json
+      }
+      inicio_workspace_base: {
+        Args: {
+          p_carrera_id?: string
+          p_facultad_id?: string
+          p_rol_clave?: string
+        }
+        Returns: Json
+      }
+      inicio_workspace_dashboard_base: {
+        Args: {
+          p_carrera_id?: string
+          p_facultad_id?: string
+          p_rol_clave?: string
+        }
+        Returns: Json
+      }
+      inicio_workspace_editable_base: {
         Args: {
           p_carrera_id?: string
           p_facultad_id?: string
@@ -5534,6 +5844,19 @@ export type Database = {
           p_activo?: boolean
           p_carrera_id?: string
           p_facultad_id?: string
+          p_nivel?: string
+          p_tipo_estructura?: Database['public']['Enums']['tipo_estructura_plan']
+        }
+        Returns: {
+          estado_id: string
+        }[]
+      }
+      planes_catalogo_estados_disponibles_versiones: {
+        Args: {
+          p_activo?: boolean
+          p_carrera_id?: string
+          p_facultad_id?: string
+          p_modo_version?: string
           p_nivel?: string
           p_tipo_estructura?: Database['public']['Enums']['tipo_estructura_plan']
         }
@@ -6131,8 +6454,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         SetofOptions: {
           from: '*'
@@ -6188,10 +6510,7 @@ export type Database = {
         | 'failed'
         | 'deleted'
       estado_publicacion_estructura:
-        | 'BORRADOR'
-        | 'PUBLICADA'
-        | 'RETIRADA'
-        | 'ARCHIVADA'
+        'BORRADOR' | 'PUBLICADA' | 'RETIRADA' | 'ARCHIVADA'
       estado_sesion_carga_documento:
         | 'created'
         | 'uploading'
@@ -6225,11 +6544,7 @@ export type Database = {
       fase_diseno_curricular: 'FUNDAMENTOS' | 'BLOQUES' | 'MAPA'
       fuente_cambio: 'HUMANO' | 'IA'
       learning_generation_estado:
-        | 'queued'
-        | 'running'
-        | 'needs_review'
-        | 'completed'
-        | 'failed'
+        'queued' | 'running' | 'needs_review' | 'completed' | 'failed'
       learning_generation_scope: 'tema' | 'unidad' | 'asignatura'
       learning_object_tipo:
         | 'apunte'
@@ -6255,11 +6570,7 @@ export type Database = {
         | 'profesor'
         | 'lci'
       rol_archivo_importacion:
-        | 'PLAN'
-        | 'MAPA'
-        | 'PROGRAMA'
-        | 'RESOLUCION'
-        | 'OTRO'
+        'PLAN' | 'MAPA' | 'PROGRAMA' | 'RESOLUCION' | 'OTRO'
       rol_responsable_asignatura: 'PROFESOR_RESPONSABLE' | 'COAUTOR' | 'REVISOR'
       rol_version_plan: 'ANTECEDENTE' | 'VERSION_TRABAJO'
       tipo_asignatura: 'OBLIGATORIA' | 'OPTATIVA' | 'TRONCAL' | 'OTRA'
@@ -6293,12 +6604,7 @@ export type Database = {
         | 'IMPORTADO_DOCUMENTAL'
         | 'REDISENO'
       tipo_sujeto_archivo_documental:
-        | 'user'
-        | 'role'
-        | 'plan'
-        | 'subject'
-        | 'conversation'
-        | 'tenant'
+        'user' | 'role' | 'plan' | 'subject' | 'conversation' | 'tenant'
       tipo_trabajo_generacion_ia:
         | 'plan'
         | 'asignatura'
@@ -6331,12 +6637,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6358,13 +6664,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6383,13 +6688,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6408,13 +6712,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6427,11 +6730,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

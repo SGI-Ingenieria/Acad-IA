@@ -53,6 +53,52 @@ const AMBITO_ASIGNATURA = {
   planId: PLAN,
 }
 
+Deno.test(
+  'el agente conserva las materias, líneas y prerrequisitos de Área común',
+  () => {
+    const req = peticion({
+      accion: 'reorganizar_mapa',
+      ambito: AMBITO_PLAN,
+      sesion_id: SESION,
+      payload: {
+        ...CONTEXTO_MAPA,
+        asignaturas: [
+          asignaturaMapa(ASIGNATURA, { solo_lectura: true }),
+          asignaturaMapa(OTRA_ASIGNATURA),
+        ],
+        lineas: [
+          { id: LINEA_A, nombre: 'Área común', orden: 1, solo_lectura: true },
+          CONTEXTO_MAPA.lineas[1],
+        ],
+      },
+    })
+    const salida = (movimientos: unknown[], seriaciones: unknown[] = []) =>
+      interpretarSalida(req, {
+        decision: 'aplicar',
+        resultado: { lineas_nuevas: [], movimientos, seriaciones },
+        motivo: null,
+      })
+    assertEquals(
+      salida([{ asignatura_id: ASIGNATURA, numero_ciclo: 2, linea: LINEA_B }])
+        .tipo,
+      'incoherente',
+    )
+    assertEquals(
+      salida([
+        { asignatura_id: OTRA_ASIGNATURA, numero_ciclo: 2, linea: LINEA_A },
+      ]).tipo,
+      'incoherente',
+    )
+    assertEquals(
+      salida(
+        [{ asignatura_id: OTRA_ASIGNATURA, numero_ciclo: 2, linea: LINEA_B }],
+        [{ asignatura_id: ASIGNATURA, prerrequisito_asignatura_id: null }],
+      ).tipo,
+      'incoherente',
+    )
+  },
+)
+
 // ------------------------------------------------------------------ contrato
 
 Deno.test(

@@ -40,6 +40,42 @@ function assignment(
 }
 
 describe('buildPlanCapabilities scoped roles', () => {
+  test('Área común gestiona su catálogo sin adquirir edición de licenciaturas', () => {
+    const input = {
+      roleKeys: new Set(['AREA_COMUN']),
+      isAdmin: false,
+      has: (permiso: string) => permiso === 'area_comun.gestionar',
+    }
+    const plan = planFixture({
+      estado: 'BORRADOR',
+      carreraId: 'car-1',
+      facultadId: 'fac-1',
+      nivel: 'Licenciatura',
+    })
+    expect(buildPlanCapabilities({ ...input, plan }).canEditPlan).toBe(false)
+    expect(
+      buildPlanCapabilities({
+        ...input,
+        plan: {
+          ...plan,
+          categoria: 'AREA_COMUN',
+          carrera_id: null,
+          carreras: null,
+        },
+      }).canEditAsignaturas,
+    ).toBe(true)
+    expect(
+      buildPlanCapabilities({
+        ...input,
+        plan: {
+          ...plan,
+          categoria: 'AREA_COMUN',
+          carrera_id: null,
+          carreras: null,
+        },
+      }).canDiscardPlan,
+    ).toBe(false)
+  })
   test('freezes a discarded plan even for its normal editor', () => {
     const capabilities = buildPlanCapabilities({
       plan: planFixture({

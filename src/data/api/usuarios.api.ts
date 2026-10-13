@@ -41,7 +41,8 @@ export type Rol = {
   nombre: string
   descripcion: string | null
   nivel_jerarquico: number
-  alcance_default: 'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo'
+  alcance_default:
+    'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo' | 'area_comun'
 }
 
 export type Permiso = {
@@ -112,9 +113,7 @@ export type UsuariosCatalogosGestion = {
 }
 
 export type ResponsableRolSimulado =
-  | 'PROFESOR_RESPONSABLE'
-  | 'COAUTOR'
-  | 'REVISOR'
+  'PROFESOR_RESPONSABLE' | 'COAUTOR' | 'REVISOR'
 
 export type RolSimulacionActiva = {
   activa: true

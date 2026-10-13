@@ -8,6 +8,7 @@ import type { PlanEstudio, UUID } from '@/data/types/domain'
 import { showAppPrompt } from '@/components/ui/app-alert-dialog'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useResponsablesAsignatura } from '@/data/hooks/useResponsables'
+import { useSubject } from '@/data/hooks/useSubjects'
 
 // Roles de responsabilidad que SÍ pueden editar el contenido de la asignatura.
 // REVISOR queda fuera: solo comenta / revisa (coincide con la BD).
@@ -107,6 +108,27 @@ export function buildPlanCapabilities({
   const estadoClave = plan?.estados_plan?.clave ?? null
   const isAntecedente = plan?.rol_version_plan === 'ANTECEDENTE'
   const isDiscarded = Boolean(plan?.descartado_en)
+
+  if (plan?.categoria === 'AREA_COMUN') {
+    const gestionar = !isDiscarded && (isAdmin || has('area_comun.gestionar'))
+    return {
+      estadoClave,
+      isAntecedente,
+      isDiscarded,
+      canDiscardPlan: false,
+      isFrozenForEditing: !gestionar,
+      canEditPlan: gestionar,
+      canEditAsignaturas: gestionar,
+      canEditRestrictedFields: gestionar,
+      canComment: gestionar,
+      canUseIA: gestionar && has('ia.usar'),
+      showIATabs: gestionar,
+      requiresAdminOverrideForEdit: false,
+      readOnlyReason: gestionar
+        ? null
+        : 'El catálogo es administrado por Área común.',
+    }
+  }
 
   if (isAntecedente) {
     return {
@@ -226,8 +248,23 @@ export function useAsignaturaCapabilities(
   const base = usePlanCapabilities(plan)
   const { session, has } = usePermissions()
   const { data: responsables } = useResponsablesAsignatura(asignaturaId ?? null)
+  const { data: asignatura, isPlaceholderData } = useSubject(asignaturaId)
 
   return useMemo(() => {
+    if (asignatura?.area_comun_origen_id || !asignatura || isPlaceholderData) {
+      return {
+        ...base,
+        canEditAsignaturas: false,
+        canEditRestrictedFields: false,
+        canUseIA: false,
+        showIATabs: false,
+        isFrozenForEditing: true,
+        requiresAdminOverrideForEdit: false,
+        readOnlyReason: asignatura?.area_comun_origen_id
+          ? 'Área común · Contenido publicado de solo lectura.'
+          : base.readOnlyReason,
+      }
+    }
     // Ya puede editar por rol de plan (o admin override): nada que ampliar.
     if (base.canEditAsignaturas || !asignaturaId) return base
     // La edición del responsable solo aplica en etapas de escritura normal.
@@ -263,7 +300,15 @@ export function useAsignaturaCapabilities(
       requiresAdminOverrideForEdit: false,
       readOnlyReason: null,
     }
-  }, [base, asignaturaId, session, responsables, has])
+  }, [
+    base,
+    asignaturaId,
+    asignatura,
+    isPlaceholderData,
+    session,
+    responsables,
+    has,
+  ])
 }
 
 export function requestAdminOverrideReason(

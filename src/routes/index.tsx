@@ -51,6 +51,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useMesaTrabajo } from '@/data/hooks/useInicio'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
+import { AreaComunInicio } from '@/features/planes/area-comun/AreaComunControl'
 import {
   buildWorkspaceDashboard,
   groupActionsByPlan,
@@ -67,6 +68,7 @@ type InicioSearch = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  AREA_COMUN: 'Área común',
   ADMIN: 'Administración',
   VICERRECTOR_ACADEMICO: 'Vicerrectoría académica',
   DIRECTOR_FACULTAD: 'Dirección de facultad',
@@ -152,7 +154,9 @@ function InicioPage() {
     }
   }, [contexto, navigate, search.contexto])
 
-  const mesa = useMesaTrabajo(contexto)
+  const mesa = useMesaTrabajo(
+    contexto?.rolClave === 'AREA_COMUN' ? null : contexto,
+  )
   const userName =
     String(session?.user.user_metadata.nombre_completo ?? '').trim() ||
     session?.user.email?.split('@')[0] ||
@@ -175,6 +179,39 @@ function InicioPage() {
 
   if (isLoading || !contexto) {
     return <InicioSkeleton />
+  }
+
+  if (contexto.rolClave === 'AREA_COMUN') {
+    return (
+      <main className="px-seccion py-region space-y-seccion mx-auto max-w-7xl">
+        <header className="gap-grupo flex flex-wrap items-center justify-between">
+          <h1 className="text-3xl font-bold">Área común</h1>
+          {contextos.length > 1 && (
+            <Select
+              value={contextoId(contexto)}
+              onValueChange={(value) =>
+                void navigate({ search: { contexto: value } })
+              }
+            >
+              <SelectTrigger
+                className="w-80"
+                aria-label="Cambiar perspectiva de trabajo"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {contextos.map((item) => (
+                  <SelectItem key={contextoId(item)} value={contextoId(item)}>
+                    {contextoLabel(item)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </header>
+        <AreaComunInicio />
+      </main>
+    )
   }
 
   if (mesa.isError) {
@@ -949,7 +986,7 @@ function WorkspacePendingActions({
                     <Link
                       to="/planes/$planId"
                       params={{ planId: planGroup.planId }}
-                      className="text-primary mb-control inline-flex items-center gap-micro text-xs hover:underline"
+                      className="text-primary mb-control gap-micro inline-flex items-center text-xs hover:underline"
                     >
                       Ver plan <ArrowRight className="size-3" />
                     </Link>

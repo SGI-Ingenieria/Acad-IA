@@ -1,6 +1,8 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
 
 export type AppPermission =
+  | 'area_comun.gestionar'
+  | 'area_comun.publicar'
   | 'usuarios.ver'
   | 'usuarios.gestionar'
   | 'usuarios.roles.gestionar'
@@ -29,6 +31,8 @@ export type AppPermission =
 type JsonRecord = Record<string, unknown>
 
 const ADMIN_KNOWN_PERMISSIONS: Array<AppPermission> = [
+  'area_comun.gestionar',
+  'area_comun.publicar',
   'usuarios.ver',
   'usuarios.gestionar',
   'usuarios.roles.gestionar',

@@ -102,7 +102,9 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import { useAreaComun } from '@/data/hooks/useAreaComun'
 import { AccionAgente, useAccionAgente } from '@/features/agente'
+import { AreaComunControl } from '@/features/planes/area-comun/AreaComunControl'
 import { BarraVistaCurricular } from '@/features/planes/curriculo/BarraVistaCurricular'
 import {
   Flip,
@@ -119,6 +121,7 @@ import {
   PALETA_LINEAS_CURRICULARES,
 } from '@/lib/linea-curricular-colors'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 const VisualizadorSeriacionModal = lazy(() =>
@@ -175,13 +178,14 @@ const mapAsignaturasToAsignaturas = (
   return asigApi.map((asig) => {
     return {
       id: asig.id,
+      areaComunOrigenId: asig.area_comun_origen_id,
       clave: asig.codigo,
       nombre: asig.nombre,
       creditos: asig.creditos ?? 0,
       ciclo: asig.numero_ciclo ?? null,
       lineaCurricularId: asig.linea_plan_id ?? null,
       tipo: asig.tipo,
-      estado: 'borrador',
+      estado: asig.estado ?? 'borrador',
       orden: asig.orden_celda ?? 0,
       // Mapeo directo de los nuevos campos de la API
       hd: asig.horas_academicas ?? 0,
@@ -371,6 +375,8 @@ function MapaCurricularPage() {
   const { data } = usePlan(planId)
   const capabilities = usePlanCapabilities(data)
   const canEditMapa = capabilities.canEditAsignaturas
+  const { data: areaComun } = useAreaComun(planId)
+  const lineaComunId = areaComun?.incorporacion?.linea_id
   const [totalCiclos, setTotalCiclos] = useState(0)
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
@@ -580,6 +586,11 @@ function MapaCurricularPage() {
   ): Promise<boolean> => {
     const { cerrarModal = true } = opciones
     if (!canEditMapa) return false
+    if (
+      asignaturas.find((a) => a.id === asignaturaId)?.areaComunOrigenId ||
+      (lineaComunId && nuevosDatos.lineaCurricularId === lineaComunId)
+    )
+      return false
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
       ? await requestAdminOverrideReason(
           'modificar una asignatura fuera de la etapa normal del plan',
@@ -684,6 +695,16 @@ function MapaCurricularPage() {
     } = {},
   ): Promise<boolean> => {
     if (!canEditMapa || movimientos.length === 0) return false
+    if (
+      movimientos.some(
+        (m) =>
+          asignaturas.find((a) => a.id === m.id)?.areaComunOrigenId ||
+          (lineaComunId && m.lineaCurricularId === lineaComunId),
+      )
+    ) {
+      notify.error('Área común conserva sus materias y ubicaciones oficiales.')
+      return false
+    }
 
     const adminOverrideReason =
       opciones.adminOverrideReason !== undefined
@@ -838,6 +859,7 @@ function MapaCurricularPage() {
     lineas.length > 0 ? lineas.map((l) => l.color) : PALETA_LINEAS_CURRICULARES
 
   const asignaturaAMapa = (asignatura: Asignatura): AsignaturaMapa => ({
+    solo_lectura: Boolean(asignatura.areaComunOrigenId),
     id: asignatura.id,
     nombre: asignatura.nombre,
     clave: asignatura.clave || null,
@@ -852,6 +874,7 @@ function MapaCurricularPage() {
 
   const contextoMapa = (): ContextoMapa => ({
     lineas: lineas.map((linea) => ({
+      solo_lectura: linea.id === lineaComunId,
       id: linea.id,
       nombre: linea.nombre,
       orden: linea.orden,
@@ -1345,7 +1368,10 @@ function MapaCurricularPage() {
   }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
-    if (!canEditMapa) {
+    if (
+      !canEditMapa ||
+      asignaturas.find((a) => a.id === id)?.areaComunOrigenId
+    ) {
       e.preventDefault()
       return
     }
@@ -1663,6 +1689,7 @@ function MapaCurricularPage() {
           ) : undefined
         }
       >
+        {data && <AreaComunControl plan={data} editable={canEditMapa} />}
         <span className="text-foreground/80 text-2l font-medium">
           {nombreTipoCiclo(data?.tipo_ciclo)}s
         </span>
@@ -1881,6 +1908,13 @@ function MapaCurricularPage() {
                               onDragStart={handleDragStart}
                               onDragEnd={handleDragEnd}
                               onClick={() => {
+                                if (m.areaComunOrigenId) {
+                                  void navigate({
+                                    to: '/planes/$planId/asignaturas/$asignaturaId',
+                                    params: { planId, asignaturaId: m.id },
+                                  })
+                                  return
+                                }
                                 if (!canEditMapa) return
                                 setEditingData(m)
                                 setIsEditModalOpen(true)
@@ -1896,19 +1930,21 @@ function MapaCurricularPage() {
                           </div>
                         ))}
 
-                      {canEditMapa && unassignedAsignaturas.length > 0 && (
-                        <CeldaAgregarAsignatura
-                          disponibles={unassignedAsignaturas}
-                          ariaLabel={`Asignar una asignatura pendiente a ${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
-                          opcionesAgente={opcionesCelda(linea, cicloNumero)}
-                          onSelect={(asignaturaId) =>
-                            void procesarCambioAsignatura(asignaturaId, {
-                              ciclo: cicloNumero,
-                              lineaCurricularId: linea.id,
-                            })
-                          }
-                        />
-                      )}
+                      {canEditMapa &&
+                        linea.id !== lineaComunId &&
+                        unassignedAsignaturas.length > 0 && (
+                          <CeldaAgregarAsignatura
+                            disponibles={unassignedAsignaturas}
+                            ariaLabel={`Asignar una asignatura pendiente a ${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
+                            opcionesAgente={opcionesCelda(linea, cicloNumero)}
+                            onSelect={(asignaturaId) =>
+                              void procesarCambioAsignatura(asignaturaId, {
+                                ciclo: cicloNumero,
+                                lineaCurricularId: linea.id,
+                              })
+                            }
+                          />
+                        )}
                     </div>
                   ))}
 

@@ -259,7 +259,7 @@ function AsignaturasPage() {
   }
 
   const handleArchiveConfirm = async () => {
-    if (!archivingSubject) return
+    if (!archivingSubject || archivingSubject.areaComunOrigenId) return
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
       ? await requestAdminOverrideReason(
           'archivar una asignatura fuera de la etapa normal del plan',
@@ -628,7 +628,8 @@ function AsignaturasPage() {
                     {canEditAsignaturas && (
                       <TableCell className="px-seccion py-grupo">
                         <div className="gap-relacionado flex items-center justify-end opacity-100 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
-                          {asignatura.estado !== 'archivada' ? (
+                          {asignatura.estado !== 'archivada' &&
+                          !asignatura.areaComunOrigenId ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button

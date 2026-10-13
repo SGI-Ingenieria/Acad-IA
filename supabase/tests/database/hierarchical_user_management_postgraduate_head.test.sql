@@ -134,9 +134,9 @@ SELECT ok(
 
 SELECT ok(
   pg_get_functiondef(
-    'private.usuario_puede_acceder_plan(uuid, uuid)'::regprocedure
+    'private.usuario_puede_acceder_plan_sin_area_comun(uuid, uuid)'::regprocedure
   ) LIKE '%nivel_es_posgrado%',
-  'plan access helper restricts JEFE_POSGRADO by postgraduate level'
+  'ordinary plan access helper retains JEFE_POSGRADO restriction by postgraduate level'
 );
 
 SELECT ok(

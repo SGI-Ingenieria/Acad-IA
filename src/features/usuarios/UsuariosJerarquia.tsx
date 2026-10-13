@@ -94,11 +94,7 @@ const VICERRECTOR_ROLE_KEY = 'VICERRECTOR_ACADEMICO'
 
 type RoleScope = Rol['alcance_default']
 type NodeVariant =
-  | 'global'
-  | 'vicerrectoria'
-  | 'faculty'
-  | 'career'
-  | 'external'
+  'global' | 'vicerrectoria' | 'faculty' | 'career' | 'external'
 
 type GlobalRoleKey = typeof ADMIN_ROLE_KEY | typeof VICERRECTOR_ROLE_KEY
 
@@ -451,6 +447,28 @@ function HierarchyCanvas({
 
       <div ref={treeRef} className="mt-grupo pb-control relative min-h-[420px]">
         <div className="space-y-seccion">
+          {jerarquia.areaComun.length > 0 && (
+            <section className="space-y-control">
+              <h2 className="text-lg font-semibold">Área común</h2>
+              {jerarquia.areaComun.map((miembro) => {
+                const nodeId = `area-comun-${miembro.asignacion.id}`
+                return (
+                  <PersonNode
+                    key={nodeId}
+                    nodeId={nodeId}
+                    usuario={miembro.usuario}
+                    selected={selectedNodeId === nodeId}
+                    inSelectedPath={selectedPathIds.includes(nodeId)}
+                    matched={isMatched(nodeId, viewModel)}
+                    variant="global"
+                    reducedMotion={reducedMotion}
+                    onSelect={() => onSelectNode(nodeId)}
+                    {...actionProps}
+                  />
+                )
+              })}
+            </section>
+          )}
           <div className="space-y-micro">
             <HierarchyNode
               nodeId={ADMIN_SECTION_NODE_ID}
@@ -1149,12 +1167,7 @@ function PersonNode({
   usuario: Usuario
   materias?: number
   variant:
-    | 'global'
-    | 'vicerrectoria'
-    | 'faculty'
-    | 'head'
-    | 'professor'
-    | 'external'
+    'global' | 'vicerrectoria' | 'faculty' | 'head' | 'professor' | 'external'
   selected: boolean
   inSelectedPath: boolean
   matched: boolean
@@ -2364,6 +2377,26 @@ function buildHierarchyViewModel(
     })
   }
 
+  for (const miembro of jerarquia.areaComun) {
+    const nodeId = `area-comun-${miembro.asignacion.id}`
+    if (matchesMember(miembro.usuario, searchTerm)) {
+      matchedNodeIds.add(nodeId)
+      matchedUserIds.add(miembro.usuario.id)
+    }
+    selectableByNodeId.set(nodeId, {
+      kind: 'person',
+      nodeId,
+      usuario: miembro.usuario,
+      roleLabel: 'Área común',
+      scopeLabel: 'Área curricular común básica',
+      scope: 'area_comun',
+      pathIds: [nodeId],
+      pathLabel: [
+        'Área común',
+        miembro.usuario.nombre_completo ?? 'Sin nombre',
+      ],
+    })
+  }
   return {
     hasSearch,
     searchTerm,
