@@ -283,7 +283,10 @@ function CatalogoAsignaturaItem({
   return (
     <article
       className={cn(
-        'organic-interactive group border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20 relative transition-colors',
+        'organic-interactive group relative transition-colors',
+        row.estado === 'fallida'
+          ? 'border-destructive/45 bg-destructive/5 hover:bg-destructive/10 dark:border-destructive/50 dark:bg-destructive/8 dark:hover:bg-destructive/12'
+          : 'border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20',
         modo === 'lista'
           ? 'gap-control px-grupo py-grupo md:gap-grupo md:px-seccion flex items-start border-b last:border-b-0'
           : 'p-grupo flex flex-col rounded-xl border shadow-xs dark:shadow-none',

@@ -136,6 +136,13 @@ export async function retrySubjectGenerationAttempt(args: {
   )
   const failure = record(error)
   const code = string(failure?.code)
+  if (code === 'PGRST202')
+    throw new HttpError(
+      503,
+      'El reintento aún no está habilitado en este entorno. Contacta al administrador para completar la actualización.',
+      'AI_RETRY_NOT_CONFIGURED',
+      error,
+    )
   if (code === '42501')
     throw new HttpError(
       403,

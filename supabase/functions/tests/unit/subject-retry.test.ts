@@ -16,6 +16,7 @@ Deno.test(
       ['P0002', 404, 'NOT_FOUND'],
       ['55000', 409, 'AI_RETRY_CONFLICT'],
       ['P0001', 409, 'AI_RETRY_SNAPSHOT_MISSING'],
+      ['PGRST202', 503, 'AI_RETRY_NOT_CONFIGURED'],
     ] as const) {
       const error = await assertRejects(
         () =>
@@ -32,6 +33,9 @@ Deno.test(
       )
       assertEquals(error.status, status)
       assertEquals(error.code, code)
+      if (dbCode === 'PGRST202') {
+        assertEquals(error.internalDetails, { code: 'PGRST202' })
+      }
     }
   },
 )
