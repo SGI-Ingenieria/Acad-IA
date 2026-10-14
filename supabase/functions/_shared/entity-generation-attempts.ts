@@ -118,6 +118,54 @@ function parseEnvelope(value: unknown): EntityAttemptEnvelope | null {
   }
 }
 
+export async function retrySubjectGenerationAttempt(args: {
+  supabase: EntityAttemptClient
+  subjectId: string
+  userId: string
+  safetyIdentifier: string
+}): Promise<EntityGenerationAttempt> {
+  const { data, error } = await callRpc(
+    args.supabase,
+    'reintentar_generacion_asignatura_ia',
+    {
+      p_asignatura_id: args.subjectId,
+      p_usuario_id: args.userId,
+      p_intento_id: crypto.randomUUID(),
+      p_safety_identifier: args.safetyIdentifier,
+    },
+  )
+  const failure = record(error)
+  const code = string(failure?.code)
+  if (code === '42501')
+    throw new HttpError(
+      403,
+      'No tienes permiso para reintentar la generación en este plan.',
+      'AI_RETRY_FORBIDDEN',
+    )
+  if (code === 'P0002')
+    throw new HttpError(404, 'No se encontró la asignatura.', 'NOT_FOUND')
+  if (code === '55000')
+    throw new HttpError(
+      409,
+      'La asignatura ya tiene otra generación o cambió de estado. Actualiza la vista.',
+      'AI_RETRY_CONFLICT',
+    )
+  if (code === 'P0001')
+    throw new HttpError(
+      409,
+      'No se conserva la solicitud original. Inicia una nueva generación.',
+      'AI_RETRY_SNAPSHOT_MISSING',
+    )
+  const envelope = !error ? parseEnvelope(data) : null
+  if (!envelope?.attempt)
+    throw rpcFailure(
+      'AI_RETRY_PREPARE_FAILED',
+      'No se pudo preparar el reintento.',
+      error ?? data,
+    )
+  return envelope.attempt
+}
+
 export async function prepareEntityGenerationAttempt(
   args: PrepareEntityAttemptArgs,
 ): Promise<EntityGenerationAttempt> {
