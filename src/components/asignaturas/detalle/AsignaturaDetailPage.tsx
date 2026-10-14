@@ -35,6 +35,7 @@ import {
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
 import { useComentariosPlan } from '@/data/hooks/useWorkflow'
+import { ReintentarGeneracionAsignaturaButton } from '@/features/asignaturas/ReintentarGeneracionAsignaturaButton'
 import {
   getOrganicMotion,
   gsap,
@@ -235,6 +236,16 @@ function DatosGenerales({
 
   return (
     <div ref={sectionRef} className="pb-region">
+      {data?.estado === 'fallida' && capabilities.canUseIA ? (
+        <div className="gap-control mb-grupo flex items-center">
+          <Badge variant="destructive">Generación fallida</Badge>
+          <ReintentarGeneracionAsignaturaButton
+            asignaturaId={asignaturaId}
+            planId={data.plan_estudio_id}
+            nombre={data.nombre}
+          />
+        </div>
+      ) : null}
       {/* Misma rejilla que los datos generales del plan: son la misma clase de
           tarjeta de campo y no había razón para que una pantalla apilara en una
           columna y la otra escalonara en dos. La evaluación vive en su propia

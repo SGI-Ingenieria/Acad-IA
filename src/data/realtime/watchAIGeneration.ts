@@ -560,6 +560,9 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
     queryClient.invalidateQueries({
       queryKey: qk.planAsignaturas(planId as any),
     })
+    queryClient.invalidateQueries({ queryKey: qk.catalogoAsignaturasRoot() })
+    queryClient.invalidateQueries({ queryKey: qk.asignatura(subjectId) })
+    queryClient.invalidateQueries({ queryKey: qk.inicioRoot() })
     if (kind === 'success') {
       notify.success(message, {
         id: toastId,
@@ -590,7 +593,7 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
     const estado = String((subject as any).estado ?? '').toLowerCase()
     if (estado === 'generando') return
 
-    if (estado === 'fallido') {
+    if (estado === 'fallida' || estado === 'fallido') {
       finish('error', 'La generación de la asignatura falló. Intenta de nuevo.')
       return
     }

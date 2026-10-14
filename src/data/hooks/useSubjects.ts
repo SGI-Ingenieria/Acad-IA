@@ -1,5 +1,6 @@
 import {
   useInfiniteQuery,
+  useIsMutating,
   useMutation,
   useQuery,
   useQueryClient,
@@ -18,6 +19,7 @@ import {
   lineas_insert,
   lineas_reorder,
   lineas_update,
+  reintentar_generacion_asignatura,
   subjects_clone_from_existing,
   subjects_create_manual,
   subjects_generate_document,
@@ -96,8 +98,7 @@ function subjectDeAlgunaLista(
     const preview = {
       ...asignatura,
       contenido_tematico: asignatura.contenido_tematico as
-        | AsignaturaDetail['contenido_tematico']
-        | null,
+        AsignaturaDetail['contenido_tematico'] | null,
       planes_estudio: plan ?? null,
       estructuras_asignatura: null,
     }
@@ -287,6 +288,49 @@ export function useGenerateSubjectAI() {
     // Flujo durable de IA: el wizard y el watcher gestionan los avisos.
     meta: { errorMessage: false },
   })
+}
+
+export function useReintentarGeneracionAsignatura(input: {
+  asignaturaId: UUID
+  planId: UUID
+  nombre: string
+}) {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+  const mutationKey = mk.asignaturaReintentar(input.asignaturaId)
+  const pendientes = useIsMutating({ mutationKey })
+  const mutation = useMutation({
+    mutationKey,
+    mutationFn: () => reintentar_generacion_asignatura(input.asignaturaId),
+    retry: false,
+    meta: { retryable: false },
+    onSuccess: (respuesta) => {
+      watchSubjectGeneration({
+        subjectId: input.asignaturaId,
+        planId: input.planId,
+        subjectName: input.nombre,
+        responseId: respuesta.openai.responseId,
+        queryClient: qc,
+        navigate: (path, opts) =>
+          navigate({ to: path, state: { showConfetti: opts?.showConfetti } }),
+      })
+    },
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.asignatura(input.asignaturaId) }),
+        qc.invalidateQueries({
+          queryKey: qk.asignaturaMaybe(input.asignaturaId),
+        }),
+        qc.invalidateQueries({ queryKey: qk.planAsignaturas(input.planId) }),
+        qc.invalidateQueries({ queryKey: qk.catalogoAsignaturasRoot() }),
+        qc.invalidateQueries({ queryKey: qk.planHistorial(input.planId) }),
+        qc.invalidateQueries({
+          queryKey: qk.asignaturaHistorial(input.asignaturaId),
+        }),
+        qc.invalidateQueries({ queryKey: qk.inicioRoot() }),
+      ]),
+  })
+  return { ...mutation, isPending: pendientes > 0 }
 }
 
 export type LanzarGeneracionAsignaturaInput = {

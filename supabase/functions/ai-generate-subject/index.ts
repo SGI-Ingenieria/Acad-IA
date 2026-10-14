@@ -35,6 +35,7 @@ import {
 import { createAuthenticatedContext } from '../_shared/supabase.ts'
 import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 import { validateInput } from '../_shared/validation.ts'
+import { retrySubjectGeneration } from './retry.ts'
 
 import type { Database, Json } from '../_shared/database.types.ts'
 import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
@@ -140,6 +141,12 @@ const UnifiedJsonSchema = UnifiedJsonSchemaBase.superRefine(
   },
 )
 
+const RetrySubjectSchema = z
+  .object({
+    reintentarAsignaturaId: z.string().uuid(),
+  })
+  .strict()
+
 type AsignaturaBaseSeleccionada = {
   id: string
   plan_estudio_id: string
@@ -189,6 +196,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Unified JSON create/update flow (background)
     // -----------------------------
     const rawBody = await readJsonBody(req)
+
+    const retryBody = RetrySubjectSchema.safeParse(rawBody)
+    if (retryBody.success) {
+      const service = OpenAIService.fromEnv()
+      if (!(service instanceof OpenAIService)) {
+        throw new HttpError(
+          500,
+          'Configuración del servidor incompleta.',
+          'OPENAI_MISCONFIGURED',
+        )
+      }
+      return await retrySubjectGeneration({
+        supabase: supabaseService,
+        userId: user.id,
+        subjectId: retryBody.data.reintentarAsignaturaId,
+        service,
+      })
+    }
 
     const parsedBody = validateInput(UnifiedJsonSchema, rawBody)
 

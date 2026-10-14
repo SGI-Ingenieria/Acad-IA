@@ -65,6 +65,7 @@ import { usePermissions } from '@/data/hooks/usePermissions'
 import { usePlanesFiltroOpciones } from '@/data/hooks/usePlans'
 import { useCatalogoAsignaturasInfinite } from '@/data/hooks/useSubjects'
 import { CatalogoVacioAsignaturas } from '@/features/asignaturas/CatalogoVacioAsignaturas'
+import { ReintentarGeneracionAsignaturaButton } from '@/features/asignaturas/ReintentarGeneracionAsignaturaButton'
 import { useModoVistaColeccion } from '@/features/preferencias/ModoVistaColeccionContext'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
 import { getOrganicMotion, gsap, organicEase, useGSAP } from '@/lib/animations'
@@ -252,7 +253,6 @@ function CatalogoAsignaturaItem({
   row: CatalogoAsignaturaRow
   modo: ModoVistaColeccion
 }) {
-  const navigate = useNavigate({ from: Route.fullPath })
   const tipo = asignaturaTipoConfig[row.tipo]
   const estado = asignaturaStatusConfig[row.estado]
   const rolesAcceso = row.motivos_acceso
@@ -270,16 +270,6 @@ function CatalogoAsignaturaItem({
     row.motivos_acceso.every(
       (motivo) => motivo.tipo === 'responsable_asignatura',
     )
-  const abrirAsignatura = () => {
-    void navigate({
-      to: '/planes/$planId/asignaturas/$asignaturaId',
-      params: {
-        planId: row.plan_estudio_id,
-        asignaturaId: row.asignatura_id,
-      },
-      search: { origen: 'catalogo', soloAsignatura },
-    })
-  }
   const tipoIconClass = {
     OBLIGATORIA:
       'border-primary/15 bg-primary/8 text-primary group-hover:bg-primary/12 focus-visible:ring-primary/30',
@@ -291,19 +281,12 @@ function CatalogoAsignaturaItem({
   } satisfies Record<CatalogoAsignaturaRow['tipo'], string>
 
   return (
-    <div
-      role="link"
-      tabIndex={0}
-      aria-label={`Abrir asignatura ${row.nombre}`}
-      onClick={abrirAsignatura}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget || event.key !== 'Enter')
-          return
-        event.preventDefault()
-        abrirAsignatura()
-      }}
+    <article
       className={cn(
-        'organic-interactive group border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20 focus-visible:ring-primary/30 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:outline-none',
+        'organic-interactive group relative transition-colors',
+        row.estado === 'fallida'
+          ? 'border-destructive/45 bg-destructive/5 hover:bg-destructive/10 dark:border-destructive/50 dark:bg-destructive/8 dark:hover:bg-destructive/12'
+          : 'border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20',
         modo === 'lista'
           ? 'gap-control px-grupo py-grupo md:gap-grupo md:px-seccion flex items-start border-b last:border-b-0'
           : 'p-grupo flex flex-col rounded-xl border shadow-xs dark:shadow-none',
@@ -319,7 +302,7 @@ function CatalogoAsignaturaItem({
           <TooltipTrigger asChild>
             <span
               className={cn(
-                'flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors',
+                'relative z-10 flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors',
                 tipoIconClass[row.tipo],
               )}
             >
@@ -338,7 +321,17 @@ function CatalogoAsignaturaItem({
               modo === 'lista' ? 'text-xl' : 'text-lg',
             )}
           >
-            {row.nombre}
+            <Link
+              to="/planes/$planId/asignaturas/$asignaturaId"
+              params={{
+                planId: row.plan_estudio_id,
+                asignaturaId: row.asignatura_id,
+              }}
+              search={{ origen: 'catalogo', soloAsignatura }}
+              className="focus-visible:after:ring-ring after:absolute after:inset-0 after:rounded-[inherit] focus-visible:outline-none focus-visible:after:ring-2"
+            >
+              {row.nombre}
+            </Link>
           </h2>
           <div className="mt-relacionado gap-x-relacionado gap-y-micro flex flex-wrap items-center">
             {row.codigo?.trim() ? (
@@ -378,7 +371,7 @@ function CatalogoAsignaturaItem({
                   to="/planes/$planId"
                   params={{ planId: row.plan_estudio_id }}
                   onClick={(event) => event.stopPropagation()}
-                  className="hover:text-primary focus-visible:ring-primary/30 line-clamp-2 min-w-0 rounded-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className="hover:text-primary focus-visible:ring-primary/30 relative z-10 line-clamp-2 min-w-0 rounded-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   {row.plan_nombre}
                 </Link>
@@ -388,7 +381,7 @@ function CatalogoAsignaturaItem({
             {modo === 'lista' ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-muted-foreground gap-relacionado inline-flex min-w-0 items-center text-xs">
+                  <span className="text-muted-foreground gap-relacionado relative z-10 inline-flex min-w-0 items-center text-xs">
                     <FacultadIconPill
                       facultad={{
                         color: row.facultad_color,
@@ -427,6 +420,13 @@ function CatalogoAsignaturaItem({
         </Badge>
 
         <div className="text-muted-foreground gap-x-control gap-y-relacionado flex min-w-0 items-center justify-end text-xs">
+          {row.estado === 'fallida' ? (
+            <ReintentarGeneracionAsignaturaButton
+              asignaturaId={row.asignatura_id}
+              planId={row.plan_estudio_id}
+              nombre={row.nombre}
+            />
+          ) : null}
           {rolesAcceso.length > 0 ? (
             <div className="gap-x-control gap-y-relacionado flex min-w-0 flex-wrap items-center justify-end">
               {rolesAcceso.map(({ label, icon: Icon }, i) => (
@@ -443,7 +443,7 @@ function CatalogoAsignaturaItem({
           {modo === 'cuadricula' ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="gap-relacionado inline-flex min-w-0 items-center">
+                <span className="gap-relacionado relative z-10 inline-flex min-w-0 items-center">
                   <FacultadIconPill
                     facultad={{
                       color: row.facultad_color,
@@ -460,7 +460,7 @@ function CatalogoAsignaturaItem({
           ) : null}
         </div>
       </div>
-    </div>
+    </article>
   )
 }
 

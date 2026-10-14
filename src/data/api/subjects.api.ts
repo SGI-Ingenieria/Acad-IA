@@ -456,19 +456,17 @@ export async function generate_subject_suggestions(
     { headers: { 'Content-Type': 'application/json' } },
   )
 
-  return raw.map(
-    (s): SugerenciaAsignatura => ({
-      nombre: s.nombre,
-      codigo: s.codigo,
-      tipo: s.tipo ?? null,
-      creditos: s.creditos ?? null,
-      horasAcademicas: s.horasAcademicas ?? null,
-      horasIndependientes: s.horasIndependientes ?? null,
-      numeroCiclo: s.numeroCiclo ?? null,
-      lineaCurricular: s.lineaCurricular?.trim() || null,
-      descripcion: s.descripcion,
-    }),
-  )
+  return raw.map((s): SugerenciaAsignatura => ({
+    nombre: s.nombre,
+    codigo: s.codigo,
+    tipo: s.tipo ?? null,
+    creditos: s.creditos ?? null,
+    horasAcademicas: s.horasAcademicas ?? null,
+    horasIndependientes: s.horasIndependientes ?? null,
+    numeroCiclo: s.numeroCiclo ?? null,
+    lineaCurricular: s.lineaCurricular?.trim() || null,
+    descripcion: s.descripcion,
+  }))
 }
 
 export async function ai_generate_subject(
@@ -480,6 +478,22 @@ export async function ai_generate_subject(
     {
       headers: { 'Content-Type': 'application/json' },
     },
+  )
+}
+
+export type ReintentarGeneracionAsignaturaRespuesta = {
+  id: UUID
+  estado: 'generando'
+  openai: { responseId: string }
+}
+
+export async function reintentar_generacion_asignatura(
+  asignaturaId: UUID,
+): Promise<ReintentarGeneracionAsignaturaRespuesta> {
+  return invokeEdge<ReintentarGeneracionAsignaturaRespuesta>(
+    EDGE.ai_generate_subject,
+    { reintentarAsignaturaId: asignaturaId },
+    { headers: { 'Content-Type': 'application/json' } },
   )
 }
 
