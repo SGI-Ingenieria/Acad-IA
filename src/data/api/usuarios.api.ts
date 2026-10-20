@@ -375,6 +375,11 @@ export type CreateUsuarioDirectoInput =
       nombre_completo: string
       email: string
       clave: string
+      roles?: Array<{
+        rol_id: string
+        facultad_id?: string | null
+        carrera_id?: string | null
+      }>
       // Solo requerida en el registro público (/registro); las llamadas
       // autenticadas (/usuarios) se autorizan por su sesión.
       masterPassword?: string
