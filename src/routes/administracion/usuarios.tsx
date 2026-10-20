@@ -1153,7 +1153,6 @@ function NuevoUsuarioDialog({
 }) {
   const createMutation = useCreateUsuario()
   const createDirectoMutation = useCreateUsuarioDirecto()
-  const assignRoleMutation = useAssignUsuarioRole()
   const {
     catalogos,
     rolesAsignables,
@@ -1186,33 +1185,22 @@ function NuevoUsuarioDialog({
 
       try {
         if (value.tipo === 'internal') {
-          const created = await createDirectoMutation.mutateAsync({
+          await createDirectoMutation.mutateAsync({
             type: 'internal',
             nombre_completo,
             email,
             clave: value.clave.trim().toLowerCase(),
-          })
-
-          let rolesFallidos = 0
-          for (const pending of pendingRoles) {
-            const rol = catalogos?.roles.find((r) => r.id === pending.rolId)
-            try {
-              await assignRoleMutation.mutateAsync({
-                usuarioId: created.id,
+            roles: pendingRoles.map((pending) => {
+              const rol = catalogos?.roles.find((r) => r.id === pending.rolId)
+              return {
                 rol_id: pending.rolId,
                 facultad_id: requiresFacultad(rol) ? pending.facultadId : null,
                 carrera_id: requiresCarrera(rol) ? pending.carreraId : null,
-              })
-            } catch {
-              rolesFallidos += 1
-            }
-          }
+              }
+            }),
+          })
 
-          if (rolesFallidos > 0) {
-            notify.error(
-              `Usuario creado, pero ${rolesFallidos} rol(es) no se pudieron asignar.`,
-            )
-          } else if (pendingRoles.length > 0) {
+          if (pendingRoles.length > 0) {
             notify.success('Usuario interno creado con sus roles.')
           } else {
             notify.success('Usuario interno creado.')
