@@ -218,6 +218,8 @@ export const mk = {
   lineaDelete: () => ['planes', 'lineas', 'delete'] as const,
   asignaturaUpdate: () => ['asignaturas', 'update'] as const,
   asignaturaGenerar: () => ['asignaturas', 'generar'] as const,
+  asignaturaReintentar: (id: string) =>
+    ['asignaturas', 'reintentar', id] as const,
   asignaturaSugerir: () => ['asignaturas', 'sugerir'] as const,
   subjectFields: () => ['asignaturas', 'updateFields'] as const,
   subjectContenido: () => ['asignaturas', 'updateContenido'] as const,

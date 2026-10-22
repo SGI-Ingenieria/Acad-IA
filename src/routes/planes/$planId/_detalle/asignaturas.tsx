@@ -83,8 +83,10 @@ import {
   planLineasOptions,
 } from '@/data/query/queryOptions'
 import { TiraPostIts, useAgente } from '@/features/agente'
+import { ReintentarGeneracionAsignaturaButton } from '@/features/asignaturas/ReintentarGeneracionAsignaturaButton'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { colorLineaCurricular } from '@/lib/linea-curricular-colors'
+import { cn } from '@/lib/utils'
 import { defaultAsignaturasSearch } from '@/types/search'
 
 const parseAsignaturasSearch = (
@@ -627,7 +629,13 @@ function AsignaturasPage() {
                     </TableCell>
                     {canEditAsignaturas && (
                       <TableCell className="px-seccion py-grupo">
-                        <div className="gap-relacionado flex items-center justify-end opacity-100 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
+                        <div
+                          className={cn(
+                            'gap-relacionado flex items-center justify-end opacity-100 transition-opacity',
+                            asignatura.estado !== 'fallida' &&
+                              'lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100',
+                          )}
+                        >
                           {asignatura.estado !== 'archivada' &&
                           !asignatura.areaComunOrigenId ? (
                             <Tooltip>
@@ -651,7 +659,17 @@ function AsignaturasPage() {
                               </TooltipContent>
                             </Tooltip>
                           ) : null}
-                          <ChevronRight className="text-muted-foreground h-5 w-5" />
+                          {asignatura.estado === 'fallida' &&
+                          capabilities.canUseIA ? (
+                            <ReintentarGeneracionAsignaturaButton
+                              asignaturaId={asignatura.id}
+                              planId={planId}
+                              nombre={asignatura.nombre}
+                              soloIcono
+                            />
+                          ) : (
+                            <ChevronRight className="text-muted-foreground h-5 w-5" />
+                          )}
                         </div>
                       </TableCell>
                     )}

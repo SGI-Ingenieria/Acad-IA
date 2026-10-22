@@ -481,6 +481,22 @@ export async function ai_generate_subject(
   )
 }
 
+export type ReintentarGeneracionAsignaturaRespuesta = {
+  id: UUID
+  estado: 'generando'
+  openai: { responseId: string }
+}
+
+export async function reintentar_generacion_asignatura(
+  asignaturaId: UUID,
+): Promise<ReintentarGeneracionAsignaturaRespuesta> {
+  return invokeEdge<ReintentarGeneracionAsignaturaRespuesta>(
+    EDGE.ai_generate_subject,
+    { reintentarAsignaturaId: asignaturaId },
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
 export async function subjects_persist_from_ai(payload: {
   planId: UUID
   jsonAsignatura: any
