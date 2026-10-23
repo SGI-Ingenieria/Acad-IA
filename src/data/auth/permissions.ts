@@ -3,6 +3,7 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js'
 export type AppPermission =
   | 'area_comun.gestionar'
   | 'area_comun.publicar'
+  | 'area_comun.bloque.editar'
   | 'usuarios.ver'
   | 'usuarios.gestionar'
   | 'usuarios.roles.gestionar'
@@ -33,6 +34,7 @@ type JsonRecord = Record<string, unknown>
 const ADMIN_KNOWN_PERMISSIONS: Array<AppPermission> = [
   'area_comun.gestionar',
   'area_comun.publicar',
+  'area_comun.bloque.editar',
   'usuarios.ver',
   'usuarios.gestionar',
   'usuarios.roles.gestionar',
@@ -75,6 +77,7 @@ export type RoleAssignmentClaim = {
   alcance_default?: string | null
   facultad_id?: string | null
   carrera_id?: string | null
+  bloque_clave?: string | null
   simulada?: boolean
 }
 
@@ -95,6 +98,8 @@ export type AuthzSimulation = {
   plan_nombre?: string | null
   asignatura_id?: string | null
   asignatura_nombre?: string | null
+  bloque_clave?: string | null
+  bloque_nombre?: string | null
   responsable_rol?: string | null
 }
 
@@ -189,6 +194,7 @@ export function getSessionRoleAssignments(
         alcance_default: readOptionalString(role.alcance_default),
         facultad_id: readOptionalString(role.facultad_id),
         carrera_id: readOptionalString(role.carrera_id),
+        bloque_clave: readOptionalString(role.bloque_clave),
         simulada: role.simulada === true,
       },
     ]
@@ -220,6 +226,8 @@ export function getSessionAuthzSimulation(
     plan_nombre: readOptionalString(value.plan_nombre),
     asignatura_id: readOptionalString(value.asignatura_id),
     asignatura_nombre: readOptionalString(value.asignatura_nombre),
+    bloque_clave: readOptionalString(value.bloque_clave),
+    bloque_nombre: readOptionalString(value.bloque_nombre),
     responsable_rol: readOptionalString(value.responsable_rol),
   }
 }

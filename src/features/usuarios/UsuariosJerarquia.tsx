@@ -2388,7 +2388,7 @@ function buildHierarchyViewModel(
       nodeId,
       usuario: miembro.usuario,
       roleLabel: 'Área común',
-      scopeLabel: 'Área curricular común básica',
+      scopeLabel: '2. Área curricular común',
       scope: 'area_comun',
       pathIds: [nodeId],
       pathLabel: [

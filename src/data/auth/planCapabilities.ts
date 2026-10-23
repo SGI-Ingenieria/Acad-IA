@@ -246,7 +246,7 @@ export function useAsignaturaCapabilities(
   asignaturaId: string | null | undefined,
 ): PlanCapabilities {
   const base = usePlanCapabilities(plan)
-  const { session, has } = usePermissions()
+  const { session, has, roleAssignments } = usePermissions()
   const { data: responsables } = useResponsablesAsignatura(asignaturaId ?? null)
   const { data: asignatura, isPlaceholderData } = useSubject(asignaturaId)
 
@@ -265,14 +265,65 @@ export function useAsignaturaCapabilities(
           : base.readOnlyReason,
       }
     }
+    const simulation = getSessionAuthzSimulation(session)
+    const bloquePorNombre: Record<string, string> = {
+      'Pensamiento y Comunicación': 'PENSAMIENTO_COMUNICACION',
+      'Humanismo y Sociedad': 'HUMANISMO_SOCIEDAD',
+      'Humanismo Sociedad': 'HUMANISMO_SOCIEDAD',
+      'Lengua Extranjera': 'LENGUA_EXTRANJERA',
+      'Emprendimiento y Sostenibilidad': 'EMPRENDIMIENTO_SUSTENTABILIDAD',
+      'Emprendimiento Sostenibilidad': 'EMPRENDIMIENTO_SUSTENTABILIDAD',
+      'Emprendimiento Sustentabilidad': 'EMPRENDIMIENTO_SUSTENTABILIDAD',
+    }
+    const meta = asignatura.meta_origen
+    const bloqueNombre =
+      meta && typeof meta === 'object' && !Array.isArray(meta)
+        ? meta.bloque
+        : undefined
+    const bloqueClave =
+      typeof bloqueNombre === 'string'
+        ? bloquePorNombre[bloqueNombre]
+        : undefined
+    if (plan?.categoria === 'AREA_COMUN' && has('area_comun.bloque.editar')) {
+      const puedeEditarBloque =
+        (simulation?.rol_clave === 'ENCARGADO_BLOQUE' &&
+          simulation.bloque_clave === bloqueClave) ||
+        roleAssignments.some(
+          (assignment) =>
+            assignment.clave === 'ENCARGADO_BLOQUE' &&
+            assignment.bloque_clave === bloqueClave,
+        )
+      if (puedeEditarBloque && bloqueClave) {
+        return {
+          ...base,
+          canEditPlan: false,
+          canEditAsignaturas: true,
+          canEditRestrictedFields: false,
+          canUseIA: has('ia.usar'),
+          showIATabs: true,
+          isFrozenForEditing: false,
+          requiresAdminOverrideForEdit: false,
+          readOnlyReason: null,
+        }
+      }
+      return {
+        ...base,
+        canEditPlan: false,
+        canEditAsignaturas: false,
+        canEditRestrictedFields: false,
+        canUseIA: false,
+        showIATabs: false,
+        isFrozenForEditing: true,
+        requiresAdminOverrideForEdit: false,
+        readOnlyReason: 'Solo puedes editar las asignaturas de tu bloque.',
+      }
+    }
     // Ya puede editar por rol de plan (o admin override): nada que ampliar.
     if (base.canEditAsignaturas || !asignaturaId) return base
     // La edición del responsable solo aplica en etapas de escritura normal.
     if (!WRITE_NORMAL_STATES.has(base.estadoClave ?? '')) return base
 
     const userId = session?.user.id ?? null
-    const simulation = getSessionAuthzSimulation(session)
-
     const simulatedEditor =
       !!simulation &&
       simulation.rol_clave === 'PROFESOR' &&
@@ -301,12 +352,14 @@ export function useAsignaturaCapabilities(
       readOnlyReason: null,
     }
   }, [
+    plan,
     base,
     asignaturaId,
     asignatura,
     isPlaceholderData,
     session,
     responsables,
+    roleAssignments,
     has,
   ])
 }

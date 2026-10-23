@@ -18,6 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
 
 const estadoConfig: Record<
   Asignatura['estado'],
@@ -90,6 +91,8 @@ export default function AsignaturaCardItem({
 }) {
   const estado = estadoConfig[asignatura.estado]
   const EstadoIcon = estado.icon
+  const nombreVisible = asignatura.nombre.trim() || 'Nombre pendiente'
+  const bloqueVisible = nombreBloqueAreaComun(asignatura.bloqueAreaComun)
 
   return (
     <div className="group relative shrink-0">
@@ -103,7 +106,7 @@ export default function AsignaturaCardItem({
               aria-grabbed={isDragging}
               aria-label={
                 ariaLabel ??
-                `${asignatura.nombre}${asignatura.areaComunOrigenId ? ', Área común, solo lectura' : ''}`
+                `${nombreVisible}${bloqueVisible ? `, bloque ${bloqueVisible}` : ''}${asignatura.areaComunOrigenId ? ', Área común, solo lectura' : ''}`
               }
               onDragStart={(e) => onDragStart(e, asignatura.id)}
               onDragEnd={onDragEnd}
@@ -111,7 +114,7 @@ export default function AsignaturaCardItem({
               onMouseLeave={onMouseLeave}
               onClick={onClick}
               className={[
-                'organic-interactive group bg-card relative block h-44 w-40 shrink-0 overflow-hidden rounded-xl p-0 text-left whitespace-normal shadow-xs',
+                'organic-interactive group bg-card relative block h-44 min-h-44 w-40 min-w-40 shrink-0 overflow-hidden rounded-xl p-0 text-left whitespace-normal shadow-xs',
                 'focus-visible:ring-ring/30 focus-visible:ring-2 focus-visible:outline-none',
                 asignatura.areaComunOrigenId
                   ? 'cursor-pointer'
@@ -122,7 +125,9 @@ export default function AsignaturaCardItem({
               style={{
                 borderColor: isActive
                   ? lineaColor
-                  : `color-mix(in oklch, ${lineaColor} 60%, var(--border))`,
+                  : asignatura.bloqueAreaComun
+                    ? lineaColor
+                    : `color-mix(in oklch, ${lineaColor} 60%, var(--border))`,
 
                 boxShadow: isActive ? 'var(--shadow-lg)' : undefined,
               }}
@@ -139,6 +144,18 @@ export default function AsignaturaCardItem({
                         />
                       )}
                       <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                      {asignatura.areaComunOrigenId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-muted-foreground text-[10px] font-semibold">
+                              AC
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Área común · Solo lectura
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     <span className="block max-w-full truncate">
                       {asignatura.clave
@@ -164,14 +181,9 @@ export default function AsignaturaCardItem({
                 </div>
 
                 {/* titulo */}
-                {asignatura.areaComunOrigenId && (
-                  <span className="text-muted-foreground text-xs">
-                    Área común · Solo lectura
-                  </span>
-                )}
                 <div className="mt-control flex min-h-0 flex-1 flex-col items-center text-center">
                   <span className="text-foreground pb-micro line-clamp-3 text-sm leading-tight">
-                    {asignatura.nombre}
+                    {nombreVisible}
                   </span>
 
                   {/* 🔥 semestre abajo */}

@@ -202,7 +202,7 @@ function IncorporacionEditor({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Área curricular común básica</DialogTitle>
+        <DialogTitle>2. Área curricular común</DialogTitle>
       </DialogHeader>
       {!contexto.publicacion_id ? (
         <p role="status">Área común aún no tiene una publicación.</p>
@@ -685,18 +685,58 @@ export function AreaComunAcceso() {
   return (
     <Button variant="outline" asChild>
       <Link to="/planes/$planId/mapa" params={{ planId: PLAN_AREA_COMUN_ID }}>
-        Área curricular común básica
+        Administrar 2. Área curricular común
       </Link>
     </Button>
   )
 }
 
-export function AreaComunInicio() {
+export function AreaComunInicio({
+  bloqueClave,
+}: {
+  bloqueClave?: string | null
+}) {
   const plan = usePlan(PLAN_AREA_COMUN_ID)
   const materias = usePlanAsignaturas(PLAN_AREA_COMUN_ID)
   const contexto = useAreaComun(PLAN_AREA_COMUN_ID)
   const [pendienteActivo, setPendienteActivo] = useState<string | null>(null)
-  const ids = materias.data?.map((a) => a.id) ?? []
+  const todasLasAsignaturas = materias.data ?? []
+  const bloquePorClave: Record<string, string> = {
+    PENSAMIENTO_COMUNICACION: 'Pensamiento y Comunicación',
+    HUMANISMO_SOCIEDAD: 'Humanismo y Sociedad',
+    LENGUA_EXTRANJERA: 'Lengua Extranjera',
+    EMPRENDIMIENTO_SUSTENTABILIDAD: 'Emprendimiento y Sostenibilidad',
+  }
+  const nombreBloque = bloqueClave ? bloquePorClave[bloqueClave] : null
+  const nombresBloqueCompatibles = new Set(
+    nombreBloque
+      ? [
+          nombreBloque,
+          ...(bloqueClave === 'HUMANISMO_SOCIEDAD'
+            ? ['Humanismo Sociedad']
+            : []),
+          ...(bloqueClave === 'EMPRENDIMIENTO_SUSTENTABILIDAD'
+            ? [
+                'Emprendimiento Sustentabilidad',
+                'Emprendimiento Sostenibilidad',
+              ]
+            : []),
+        ]
+      : [],
+  )
+  const asignaturasVisibles = nombreBloque
+    ? todasLasAsignaturas.filter((asignatura) => {
+        const meta = asignatura.meta_origen
+        return (
+          meta &&
+          typeof meta === 'object' &&
+          !Array.isArray(meta) &&
+          typeof meta.bloque === 'string' &&
+          nombresBloqueCompatibles.has(meta.bloque)
+        )
+      })
+    : todasLasAsignaturas
+  const ids = asignaturasVisibles.map((a) => a.id)
   const indicadores = useAreaComunIndicadores(PLAN_AREA_COMUN_ID, ids)
   if (plan.isPending || materias.isPending || contexto.isPending)
     return <Skeleton className="h-32 w-full" />
@@ -743,7 +783,7 @@ export function AreaComunInicio() {
         </ul>
       </section>
     )
-  const asignaturas = materias.data
+  const asignaturas = asignaturasVisibles
   const relaciones = indicadores.data
   const categorias = [
     {
@@ -837,16 +877,23 @@ export function AreaComunInicio() {
       ),
     },
   ]
-  const pendientes = categorias.reduce(
+  const categoriasVisibles = bloqueClave
+    ? categorias.filter((categoria) =>
+        ['datos', 'contenido', 'bibliografia', 'evaluacion'].includes(
+          categoria.id,
+        ),
+      )
+    : categorias
+  const pendientes = categoriasVisibles.reduce(
     (sum, categoria) => sum + categoria.afectadas.length,
     0,
   )
-  const total = asignaturas.length * categorias.length
+  const total = asignaturas.length * categoriasVisibles.length
   const avance = total ? Math.round(((total - pendientes) / total) * 100) : 100
-  const prioridad = categorias.find(
+  const prioridad = categoriasVisibles.find(
     (categoria) => categoria.afectadas.length > 0,
   )
-  const seleccion = categorias.find(
+  const seleccion = categoriasVisibles.find(
     (categoria) => categoria.id === pendienteActivo,
   )
   return (
@@ -858,6 +905,7 @@ export function AreaComunInicio() {
               {plan.data.nombre_display}
             </h2>
             <p className="text-muted-foreground text-sm">
+              {nombreBloque ? `${nombreBloque} · ` : ''}
               {asignaturas.length} asignaturas ·{' '}
               {contexto.data.numero_publicacion
                 ? `Publicación ${contexto.data.numero_publicacion}`
@@ -865,14 +913,16 @@ export function AreaComunInicio() {
               {contexto.data.borrador && ' · Cambios en borrador'}
             </p>
           </div>
-          <Button asChild>
-            <Link
-              to="/planes/$planId/mapa"
-              params={{ planId: PLAN_AREA_COMUN_ID }}
-            >
-              Abrir plan
-            </Link>
-          </Button>
+          {!bloqueClave && (
+            <Button asChild>
+              <Link
+                to="/planes/$planId/mapa"
+                params={{ planId: PLAN_AREA_COMUN_ID }}
+              >
+                Administrar 2. Área curricular común
+              </Link>
+            </Button>
+          )}
         </div>
       </section>
 
@@ -953,7 +1003,7 @@ export function AreaComunInicio() {
             <Skeleton className="h-32 w-full" />
           ) : (
             <div className="gap-control grid sm:grid-cols-2 xl:grid-cols-3">
-              {categorias.map((categoria) => (
+              {categoriasVisibles.map((categoria) => (
                 <button
                   key={categoria.id}
                   type="button"
@@ -976,7 +1026,38 @@ export function AreaComunInicio() {
           )}
         </section>
       </div>
-      <AreaComunPlanesUsuarios planId={PLAN_AREA_COMUN_ID} />
+      {bloqueClave && (
+        <section className="space-y-grupo">
+          <h3 className="text-xl font-semibold">Materias del bloque</h3>
+          <ul className="divide-border divide-y">
+            {asignaturas.map((asignatura) => (
+              <li key={asignatura.id}>
+                <Link
+                  to="/planes/$planId/asignaturas/$asignaturaId"
+                  params={{
+                    planId: PLAN_AREA_COMUN_ID,
+                    asignaturaId: asignatura.id,
+                  }}
+                  className="gap-grupo py-control hover:text-primary flex items-center justify-between"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {asignatura.nombre}
+                    </span>
+                    <span className="text-muted-foreground text-sm">
+                      {[asignatura.codigo, `C${asignatura.numero_ciclo ?? '—'}`]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </span>
+                  <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {!bloqueClave && <AreaComunPlanesUsuarios planId={PLAN_AREA_COMUN_ID} />}
       <Dialog
         open={Boolean(seleccion)}
         onOpenChange={(open) => !open && setPendienteActivo(null)}
@@ -999,10 +1080,7 @@ export function AreaComunInicio() {
                   >
                     <span>{asignatura.nombre}</span>
                     <Button variant="ghost" size="sm" asChild>
-                      <Link
-                        {...seleccion.ruta(asignatura.id)}
-                        onClick={() => setPendienteActivo(null)}
-                      >
+                      <Link {...seleccion.ruta(asignatura.id)}>
                         Abrir <ArrowRight />
                       </Link>
                     </Button>

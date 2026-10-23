@@ -4,6 +4,13 @@ import type { Tables } from '@/types/supabase'
 export const mapAsignaturaRow = (asig: Tables<'asignaturas'>): Asignatura => ({
   id: asig.id,
   areaComunOrigenId: asig.area_comun_origen_id,
+  bloqueAreaComun:
+    asig.meta_origen &&
+    typeof asig.meta_origen === 'object' &&
+    !Array.isArray(asig.meta_origen) &&
+    typeof asig.meta_origen.bloque === 'string'
+      ? asig.meta_origen.bloque
+      : null,
   clave: asig.codigo ?? '',
   nombre: asig.nombre,
   creditos: asig.creditos ?? 0,

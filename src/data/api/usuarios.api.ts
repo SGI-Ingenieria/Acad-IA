@@ -42,7 +42,13 @@ export type Rol = {
   descripcion: string | null
   nivel_jerarquico: number
   alcance_default:
-    'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo' | 'area_comun'
+    | 'global'
+    | 'facultad'
+    | 'carrera'
+    | 'asignatura'
+    | 'externo'
+    | 'area_comun'
+    | 'area_comun_bloque'
 }
 
 export type Permiso = {
@@ -76,6 +82,10 @@ export type UsuarioRol = {
     facultad_id: string
     nivel: string
   } | null
+  area_comun_encargados_bloque?: Array<{
+    bloque_clave: string
+    area_comun_bloques: { nombre: string } | null
+  }>
 }
 
 export type UsuariosCatalogos = {
@@ -97,6 +107,14 @@ export type UsuariosCatalogos = {
     nombre_corto: string | null
     nivel: string
     activa: boolean
+  }>
+  bloques_area_comun?: Array<{
+    clave: string
+    nombre: string
+    color: string
+    asignaturas_referencia: number
+    horas_referencia: number
+    orden: number
   }>
   gestion: UsuariosCatalogosGestion
 }
@@ -129,6 +147,8 @@ export type RolSimulacionActiva = {
   plan_nombre?: string | null
   asignatura_id?: string | null
   asignatura_nombre?: string | null
+  bloque_clave?: string | null
+  bloque_nombre?: string | null
   responsable_rol?: ResponsableRolSimulado
   activada_en?: string
 }
@@ -145,6 +165,7 @@ export type ActivarRolSimulacionInput = {
   carrera_id?: string | null
   plan_estudio_id?: string | null
   asignatura_id?: string | null
+  bloque_clave?: string | null
   responsable_rol?: ResponsableRolSimulado
 }
 
@@ -343,6 +364,7 @@ export type AssignUsuarioRoleInput = {
   rol_id: string
   facultad_id?: string | null
   carrera_id?: string | null
+  bloque_clave?: string | null
   // Ejecuta el "proceso de nombramiento": retira al titular previo del mismo
   // rol+alcance y asigna a este usuario de forma atómica.
   reemplazar?: boolean

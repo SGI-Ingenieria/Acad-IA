@@ -65,6 +65,7 @@ export function getScopeStyles(
 ): string {
   switch (alcance) {
     case 'area_comun':
+    case 'area_comun_bloque':
       return 'border-primary/25 bg-primary/10 text-primary'
     case 'facultad':
       return 'border-chart-4/25 bg-chart-4/10 text-chart-4'

@@ -66,7 +66,7 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
-import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { requirePlanPermission } from '@/data/auth/routeGuards'
 import { useAreaComunRealtime } from '@/data/hooks/useAreaComun'
 import { useSession } from '@/data/hooks/useAuth'
 import { useLinajePlan } from '@/data/hooks/useImportacionesAcademicas'
@@ -94,7 +94,6 @@ import {
   useCommentsRead,
 } from '@/features/comentarios/hooks/useCommentsRead'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
-import { AreaComunPlanesUsuarios } from '@/features/planes/area-comun/AreaComunControl'
 import { PlanFlowPanel } from '@/features/planes/PlanFlowPanel'
 import { PlanHistoryPanel } from '@/features/planes/PlanHistoryPanel'
 import { TransicionEstadoDialog } from '@/features/planes/TransicionEstadoDialog'
@@ -170,8 +169,8 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
   search: {
     middlewares: [stripSearchParams(defaultPlanDetalleSearch)],
   },
-  beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, ['planes.ver']),
+  beforeLoad: ({ context, params }) =>
+    requirePlanPermission(context.queryClient, params.planId, ['planes.ver']),
   // Solo precalentamos la caché sin bloquear: el shell del detalle (barra de
   // volver, cabecera, tarjetas y tabs) se pinta de inmediato y cada zona
   // muestra su placeholder mientras los datos llegan. El "no encontrado" se
@@ -691,9 +690,6 @@ function RouteComponent() {
           data-comment-key={planId}
         >
           <Outlet />
-          {data?.categoria === 'AREA_COMUN' && (
-            <AreaComunPlanesUsuarios planId={planId} />
-          )}
         </main>
 
         <PlanCommentsManager

@@ -77,6 +77,9 @@ function activeLabel(simulation: ReturnType<typeof getSessionAuthzSimulation>) {
   if (simulation.asignatura_nombre) {
     return `${simulation.rol_nombre ?? 'Rol'} · ${simulation.asignatura_nombre}`
   }
+  if (simulation.bloque_nombre) {
+    return `${simulation.rol_nombre ?? 'Rol'} · ${simulation.bloque_nombre}`
+  }
   if (simulation.carrera_nombre) {
     return `${simulation.rol_nombre ?? 'Rol'} · ${simulation.carrera_nombre}`
   }
@@ -115,6 +118,7 @@ export function RoleSimulationControl() {
   const [roleId, setRoleId] = useState('')
   const [facultadId, setFacultadId] = useState('')
   const [carreraId, setCarreraId] = useState('')
+  const [bloqueClave, setBloqueClave] = useState('')
   const [subjectQuery, setSubjectQuery] = useState('')
   const [selectedSubject, setSelectedSubject] =
     useState<SimulacionAsignaturaOption | null>(null)
@@ -138,6 +142,8 @@ export function RoleSimulationControl() {
   const needsFacultad = roleRequiresFacultad(selectedRole)
   const needsCarrera = roleRequiresCarrera(selectedRole)
   const needsSubject = roleRequiresAsignatura(selectedRole)
+  const needsBloque = selectedRole?.alcance_default === 'area_comun_bloque'
+  const bloquesAreaComun = catalogosQuery.data?.bloques_area_comun ?? []
 
   const facultades = catalogosQuery.data?.facultades ?? []
   const selectedFacultad = facultades.find(
@@ -180,6 +186,7 @@ export function RoleSimulationControl() {
     setRoleId(simulation?.rol_id ?? firstRoleId)
     setFacultadId(simulation?.facultad_id ?? '')
     setCarreraId(simulation?.carrera_id ?? '')
+    setBloqueClave(simulation?.bloque_clave ?? '')
     setSubjectQuery(simulation?.asignatura_nombre ?? '')
     setSelectedSubject(
       simulation?.asignatura_id
@@ -228,6 +235,10 @@ export function RoleSimulationControl() {
       notify.error('Selecciona una asignatura.')
       return
     }
+    if (needsBloque && !bloqueClave) {
+      notify.error('Selecciona un bloque de Área común.')
+      return
+    }
 
     try {
       const result = await activateMutation.mutateAsync({
@@ -235,6 +246,7 @@ export function RoleSimulationControl() {
         facultad_id: needsFacultad ? facultadId : null,
         carrera_id: needsCarrera ? carreraId : null,
         asignatura_id: needsSubject ? selectedSubject?.id : null,
+        bloque_clave: needsBloque ? bloqueClave : null,
         responsable_rol:
           selectedRole.clave === 'PROFESOR' ? responsableRol : undefined,
       })
@@ -518,6 +530,28 @@ export function RoleSimulationControl() {
                     )}
                   </div>
                 ) : null}
+              </div>
+            ) : null}
+
+            {needsBloque ? (
+              <div className="gap-relacionado grid">
+                <Label>Bloque de Área común</Label>
+                <Select
+                  value={bloqueClave}
+                  onValueChange={setBloqueClave}
+                  disabled={controlsDisabled || bloquesAreaComun.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar bloque" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bloquesAreaComun.map((bloque) => (
+                      <SelectItem key={bloque.clave} value={bloque.clave}>
+                        {bloque.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             ) : null}
 

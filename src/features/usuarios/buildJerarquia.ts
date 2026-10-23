@@ -132,7 +132,7 @@ export function construirJerarquia(
       if (!clave) continue
       const miembro: MiembroJerarquia = { usuario, asignacion }
 
-      if (clave === 'AREA_COMUN') {
+      if (clave === 'AREA_COMUN' || clave === 'ENCARGADO_BLOQUE') {
         areaComun.push(miembro)
       } else if (
         (ROLES_JERARQUIA.global as ReadonlyArray<string>).includes(clave)

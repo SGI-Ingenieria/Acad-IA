@@ -29,6 +29,7 @@ export type LineaCurricular = Tables<'lineas_plan'>
 
 export interface Asignatura {
   areaComunOrigenId?: string | null
+  bloqueAreaComun?: string | null
   id: string
   clave: string
   nombre: string

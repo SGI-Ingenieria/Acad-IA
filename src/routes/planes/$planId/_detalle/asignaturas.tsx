@@ -84,6 +84,7 @@ import {
 } from '@/data/query/queryOptions'
 import { TiraPostIts, useAgente } from '@/features/agente'
 import { ReintentarGeneracionAsignaturaButton } from '@/features/asignaturas/ReintentarGeneracionAsignaturaButton'
+import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { colorLineaCurricular } from '@/lib/linea-curricular-colors'
 import { cn } from '@/lib/utils'
@@ -588,24 +589,39 @@ function AsignaturasPage() {
                         const lineaItem = getLinea(asignatura.lineaCurricularId)
                         const nombre = lineaItem?.nombre ?? 'Sin asignar'
                         const color = lineaItem?.color
-                        if (!color) {
-                          return (
-                            <span className="text-muted-foreground text-sm font-medium">
-                              {nombre}
-                            </span>
-                          )
-                        }
+                        const bloque =
+                          plan?.categoria === 'AREA_COMUN'
+                            ? nombreBloqueAreaComun(asignatura.bloqueAreaComun)
+                            : null
                         return (
-                          <span
-                            className="px-control py-micro inline-flex items-center rounded-full text-sm font-medium"
-                            style={{
-                              backgroundColor: `${color}22`,
-                              color,
-                              border: `1px solid ${color}55`,
-                            }}
-                          >
-                            {nombre}
-                          </span>
+                          <div className="gap-micro flex flex-col items-start">
+                            {color ? (
+                              <span
+                                className="px-control py-micro inline-flex items-center rounded-full text-sm font-medium"
+                                style={{
+                                  backgroundColor: `${color}22`,
+                                  color,
+                                  border: `1px solid ${color}55`,
+                                }}
+                              >
+                                {nombre}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm font-medium">
+                                {nombre}
+                              </span>
+                            )}
+                            {bloque && (
+                              <span
+                                className="text-muted-foreground border-border pl-relacionado border-l-2 text-xs font-medium"
+                                style={{
+                                  borderLeftColor: color ?? 'var(--primary)',
+                                }}
+                              >
+                                {bloque}
+                              </span>
+                            )}
+                          </div>
                         )
                       })()}
                     </TableCell>

@@ -26,6 +26,12 @@ export function getRoleName(asignacion: UsuarioRol) {
 
 export function getScopeLabel(asignacion: UsuarioRol) {
   if (asignacion.roles?.clave === 'AREA_COMUN') return 'Área común'
+  if (asignacion.roles?.clave === 'ENCARGADO_BLOQUE') {
+    return (
+      asignacion.area_comun_encargados_bloque?.[0]?.area_comun_bloques?.nombre ??
+      'Bloque de Área común'
+    )
+  }
   if (asignacion.carreras) {
     return asignacion.carreras.nombre_corto ?? asignacion.carreras.nombre
   }

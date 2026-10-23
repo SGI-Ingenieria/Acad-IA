@@ -7,6 +7,607 @@ export type Json =
   | Json[]
 
 export type Database = {
+  private: {
+    Tables: {
+      area_comun_operaciones: {
+        Row: {
+          backend: number
+          transaccion: number
+        }
+        Insert: {
+          backend: number
+          transaccion: number
+        }
+        Update: {
+          backend?: number
+          transaccion?: number
+        }
+        Relationships: []
+      }
+      intentos_generacion_ia: {
+        Row: {
+          actualizado_en: string
+          consulta_referencias: string
+          contexto: Json
+          conversacion_id: string | null
+          creado_en: string
+          entidad_id: string
+          estado: string
+          estado_openai: string | null
+          fecha_limite: string
+          handler: string
+          id: string
+          iniciado_en: string | null
+          intentos: number
+          mensaje_id: string | null
+          modo_referencias: string
+          openai_response_id: string | null
+          payload_version: number
+          publicado_en: string | null
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          referencias: Json
+          siguiente_intento: string
+          solicitud: Json
+          terminal_aplicado_en: string | null
+          tipo_conversacion:
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+          usuario_id: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          consulta_referencias?: string
+          contexto?: Json
+          conversacion_id?: string | null
+          creado_en?: string
+          entidad_id: string
+          estado?: string
+          estado_openai?: string | null
+          fecha_limite?: string
+          handler: string
+          id?: string
+          iniciado_en?: string | null
+          intentos?: number
+          mensaje_id?: string | null
+          modo_referencias?: string
+          openai_response_id?: string | null
+          payload_version?: number
+          publicado_en?: string | null
+          reclamado_hasta?: string | null
+          reclamado_por?: string | null
+          referencias?: Json
+          siguiente_intento?: string
+          solicitud: Json
+          terminal_aplicado_en?: string | null
+          tipo_conversacion?:
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion?: string | null
+          ultimo_error?: Json | null
+          usuario_id?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          consulta_referencias?: string
+          contexto?: Json
+          conversacion_id?: string | null
+          creado_en?: string
+          entidad_id?: string
+          estado?: string
+          estado_openai?: string | null
+          fecha_limite?: string
+          handler?: string
+          id?: string
+          iniciado_en?: string | null
+          intentos?: number
+          mensaje_id?: string | null
+          modo_referencias?: string
+          openai_response_id?: string | null
+          payload_version?: number
+          publicado_en?: string | null
+          reclamado_hasta?: string | null
+          reclamado_por?: string | null
+          referencias?: Json
+          siguiente_intento?: string
+          solicitud?: Json
+          terminal_aplicado_en?: string | null
+          tipo_conversacion?:
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
+          tipo_entidad?: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion?: string | null
+          ultimo_error?: Json | null
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      legacy_documental_archive: {
+        Row: {
+          archived_at: string
+          payload: Json
+          source_key: string
+          source_table: string
+        }
+        Insert: {
+          archived_at?: string
+          payload: Json
+          source_key: string
+          source_table: string
+        }
+        Update: {
+          archived_at?: string
+          payload?: Json
+          source_key?: string
+          source_table?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      intentos_chat_ia: {
+        Row: {
+          actualizado_en: string | null
+          consulta_referencias: string | null
+          contexto: Json | null
+          conversacion_id: string | null
+          creado_en: string | null
+          entidad_id: string | null
+          estado: string | null
+          estado_openai: string | null
+          fecha_limite: string | null
+          handler: string | null
+          id: string | null
+          iniciado_en: string | null
+          intentos: number | null
+          mensaje_id: string | null
+          modo_referencias: string | null
+          openai_response_id: string | null
+          payload_version: number | null
+          publicado_en: string | null
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          referencias: Json | null
+          siguiente_intento: string | null
+          solicitud: Json | null
+          tipo_conversacion:
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
+          tipo_entidad:
+            Database['public']['Enums']['tipo_trabajo_generacion_ia'] | null
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+          usuario_id: string | null
+        }
+        Insert: {
+          actualizado_en?: string | null
+          consulta_referencias?: string | null
+          contexto?: Json | null
+          conversacion_id?: string | null
+          creado_en?: string | null
+          entidad_id?: string | null
+          estado?: string | null
+          estado_openai?: string | null
+          fecha_limite?: string | null
+          handler?: string | null
+          id?: string | null
+          iniciado_en?: string | null
+          intentos?: number | null
+          mensaje_id?: string | null
+          modo_referencias?: string | null
+          openai_response_id?: string | null
+          payload_version?: number | null
+          publicado_en?: string | null
+          reclamado_hasta?: string | null
+          reclamado_por?: string | null
+          referencias?: Json | null
+          siguiente_intento?: string | null
+          solicitud?: Json | null
+          tipo_conversacion?:
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
+          tipo_entidad?:
+            Database['public']['Enums']['tipo_trabajo_generacion_ia'] | null
+          token_reclamacion?: string | null
+          ultimo_error?: Json | null
+          usuario_id?: string | null
+        }
+        Update: {
+          actualizado_en?: string | null
+          consulta_referencias?: string | null
+          contexto?: Json | null
+          conversacion_id?: string | null
+          creado_en?: string | null
+          entidad_id?: string | null
+          estado?: string | null
+          estado_openai?: string | null
+          fecha_limite?: string | null
+          handler?: string | null
+          id?: string | null
+          iniciado_en?: string | null
+          intentos?: number | null
+          mensaje_id?: string | null
+          modo_referencias?: string | null
+          openai_response_id?: string | null
+          payload_version?: number | null
+          publicado_en?: string | null
+          reclamado_hasta?: string | null
+          reclamado_por?: string | null
+          referencias?: Json | null
+          siguiente_intento?: string | null
+          solicitud?: Json | null
+          tipo_conversacion?:
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
+          tipo_entidad?:
+            Database['public']['Enums']['tipo_trabajo_generacion_ia'] | null
+          token_reclamacion?: string | null
+          ultimo_error?: Json | null
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      actualizar_estructura_asignatura_definicion: {
+        Args: { p_definicion: Json; p_id: string; p_operaciones?: Json }
+        Returns: Database['public']['Tables']['estructuras_asignatura']['Row']
+        SetofOptions: {
+          from: '*'
+          to: 'estructuras_asignatura'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      actualizar_estructura_plan_definicion: {
+        Args: { p_definicion: Json; p_id: string; p_operaciones?: Json }
+        Returns: Database['public']['Tables']['estructuras_plan']['Row']
+        SetofOptions: {
+          from: '*'
+          to: 'estructuras_plan'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ajustar_refcount_blob: {
+        Args: { p_blob_id: string; p_delta: number }
+        Returns: undefined
+      }
+      area_comun_bloque_clave: { Args: { p_bloque: string }; Returns: string }
+      area_comun_distribucion: {
+        Args: { p_config: Json; p_plan: string }
+        Returns: Json
+      }
+      area_comun_encargado: {
+        Args: { p_bloque: string; p_usuario: string }
+        Returns: boolean
+      }
+      area_comun_gestor: {
+        Args: { p_publicar?: boolean; p_usuario: string }
+        Returns: boolean
+      }
+      area_comun_materializar: {
+        Args: { p_contenido: Json; p_incorporacion: string }
+        Returns: undefined
+      }
+      area_comun_operacion: { Args: never; Returns: boolean }
+      area_comun_tiene_encargo: {
+        Args: { p_usuario: string }
+        Returns: boolean
+      }
+      authz_asignatura_responsable_editor: {
+        Args: { p_asignatura_id: string }
+        Returns: boolean
+      }
+      authz_claim_can_access_plan: {
+        Args: { p_plan_id: string }
+        Returns: boolean
+      }
+      authz_claim_has_carrera_scope: {
+        Args: { p_carrera_id: string }
+        Returns: boolean
+      }
+      authz_claim_has_facultad_scope: {
+        Args: { p_facultad_id: string }
+        Returns: boolean
+      }
+      authz_claim_has_global_scope: { Args: never; Returns: boolean }
+      authz_claim_has_permission: {
+        Args: { p_permiso: string }
+        Returns: boolean
+      }
+      authz_claim_has_role: { Args: { p_rol: string }; Returns: boolean }
+      authz_is_responsable_asignatura: {
+        Args: { p_asignatura_id: string }
+        Returns: boolean
+      }
+      authz_is_responsable_de_plan: {
+        Args: { p_plan_id: string }
+        Returns: boolean
+      }
+      authz_is_simulated_self: {
+        Args: { p_usuario_id: string }
+        Returns: boolean
+      }
+      authz_user_has_global_scope: {
+        Args: { p_usuario_id: string }
+        Returns: boolean
+      }
+      authz_user_has_permission: {
+        Args: { p_permiso: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      authz_user_has_role: {
+        Args: { p_rol: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      catalogo_asignaturas_buscar: {
+        Args: {
+          p_carrera_id?: string
+          p_estado?: Database['public']['Enums']['estado_asignatura']
+          p_facultad_id?: string
+          p_incluir_archivadas?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_plan_estudio_id?: string
+          p_q?: string
+          p_tipo?: Database['public']['Enums']['tipo_asignatura']
+        }
+        Returns: {
+          asignatura_id: string
+          carrera_id: string
+          carrera_nombre: string
+          codigo: string
+          creditos: number
+          estado: Database['public']['Enums']['estado_asignatura']
+          facultad_id: string
+          facultad_nombre: string
+          motivos_acceso: Json
+          nombre: string
+          numero_ciclo: number
+          plan_estudio_id: string
+          plan_nombre: string
+          rank: number
+          responsables: Json
+          tipo: Database['public']['Enums']['tipo_asignatura']
+          total_count: number
+        }[]
+      }
+      crear_version_redisenio_sin_area_comun: {
+        Args: {
+          p_estructura_destino_id: string
+          p_overrides?: Json
+          p_plan_origen_id: string
+        }
+        Returns: Database['public']['Tables']['planes_estudio']['Row']
+        SetofOptions: {
+          from: '*'
+          to: 'planes_estudio'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      documentos_usuario_puede_archivo: {
+        Args: {
+          p_file_id: string
+          p_permiso: Database['public']['Enums']['permiso_archivo_documental']
+          p_usuario_id: string
+        }
+        Returns: boolean
+      }
+      ejecutar_retencion_operativa: { Args: never; Returns: Json }
+      entidad_intento_ia_json: {
+        Args: {
+          p_entidad_id: string
+          p_tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+        }
+        Returns: Json
+      }
+      hay_recuperacion_ia_pendiente: { Args: never; Returns: boolean }
+      intento_chat_ia_json: { Args: { p_intento_id: string }; Returns: Json }
+      intento_generacion_ia_json: {
+        Args: { p_intento_id: string }
+        Returns: Json
+      }
+      invocar_limpieza_paquetes_aprendizaje_si_necesaria: {
+        Args: never
+        Returns: boolean
+      }
+      invocar_recuperacion_ia_si_necesaria: { Args: never; Returns: number }
+      nombrar_responsable: {
+        Args: {
+          p_actor: string
+          p_carrera: string
+          p_facultad: string
+          p_rol: string
+          p_usuario: string
+        }
+        Returns: Json
+      }
+      openai_response_id_vigente_trabajo_ia: {
+        Args: {
+          p_entidad_id: string
+          p_tipo: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+        }
+        Returns: string
+      }
+      persistir_resultado_recursos_aprendizaje_ia: {
+        Args: {
+          p_generation_job_id: string
+          p_objetos: Json
+          p_openai_response_id: string
+          p_resultado: Json
+          p_score: Json
+        }
+        Returns: Database['public']['Tables']['learning_generation_jobs']['Row']
+        SetofOptions: {
+          from: '*'
+          to: 'learning_generation_jobs'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      plan_es_antecedente: { Args: { p_plan_id: string }; Returns: boolean }
+      plan_estado_clave: { Args: { p_plan_id: string }; Returns: string }
+      publicar_intento_chat_ia_interno: {
+        Args: { p_intento_id: string }
+        Returns: Json
+      }
+      publicar_intento_entidad_ia_interno: {
+        Args: {
+          p_estado_openai?: string
+          p_exigir_token?: boolean
+          p_iniciado_en?: string
+          p_intento_id: string
+          p_openai_response_id?: string
+          p_token_reclamacion?: string
+        }
+        Returns: Json
+      }
+      reasignar_responsabilidades: {
+        Args: { p_actor: string; p_destino: string; p_origen: string }
+        Returns: Json
+      }
+      reparar_titulos_conversaciones_ia_legacy: {
+        Args: never
+        Returns: {
+          asignaturas_actualizadas: number
+          planes_actualizados: number
+        }[]
+      }
+      tenant_documental_predeterminado: {
+        Args: { p_usuario_id: string }
+        Returns: string
+      }
+      titulo_conversacion_ia_desde_prompt: {
+        Args: { p_prompt: string }
+        Returns: string
+      }
+      transiciones_permitidas_plan: {
+        Args: { p_plan_id: string }
+        Returns: Database['public']['Tables']['estados_plan']['Row'][]
+        SetofOptions: {
+          from: '*'
+          to: 'estados_plan'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      usuario_cubre_carrera_para_gestion: {
+        Args: {
+          p_actor: string
+          p_carrera_id: string
+          p_incluir_secretaria?: boolean
+        }
+        Returns: boolean
+      }
+      usuario_es_externo_asignado_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_es_jefe_encargado_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_es_jefe_posgrado_encargado_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_acceder_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_acceder_plan_sin_area_comun: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_comentar_asignatura: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_comentar_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_asignatura: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_asignatura_sin_area_comun: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_campo_asignatura: {
+        Args: { p_asignatura_id: string; p_clave: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_campo_plan: {
+        Args: { p_clave: string; p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_plan_sin_area_comun: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_gestionar_rol: {
+        Args: {
+          p_actor: string
+          p_carrera?: string
+          p_facultad?: string
+          p_rol: string
+        }
+        Returns: boolean
+      }
+      usuario_puede_gestionar_usuario: {
+        Args: { p_actor: string; p_usuario: string }
+        Returns: boolean
+      }
+      usuario_puede_transicionar_asignatura: {
+        Args: {
+          p_asignatura_id: string
+          p_nuevo_estado: Database['public']['Enums']['estado_asignatura']
+          p_usuario_id: string
+        }
+        Returns: boolean
+      }
+      usuario_puede_transicionar_plan: {
+        Args: {
+          p_hacia_estado_id: string
+          p_plan_id: string
+          p_usuario_id: string
+        }
+        Returns: boolean
+      }
+      usuario_puede_usar_ia_asignatura: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_usar_ia_asignatura_sin_area_comun: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_tiene_rol_activo: {
+        Args: { p_rol: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_tiene_rol_contextual_plan: {
+        Args: { p_plan_id: string; p_rol: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_tiene_rol_en_plan: {
+        Args: { p_plan_id: string; p_rol: string; p_usuario_id: string }
+        Returns: boolean
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       ai_request_references: {
@@ -123,6 +724,33 @@ export type Database = {
           },
         ]
       }
+      area_comun_bloques: {
+        Row: {
+          asignaturas_referencia: number
+          clave: string
+          color: string
+          horas_referencia: number
+          nombre: string
+          orden: number
+        }
+        Insert: {
+          asignaturas_referencia: number
+          clave: string
+          color: string
+          horas_referencia: number
+          nombre: string
+          orden: number
+        }
+        Update: {
+          asignaturas_referencia?: number
+          clave?: string
+          color?: string
+          horas_referencia?: number
+          nombre?: string
+          orden?: number
+        }
+        Relationships: []
+      }
       area_comun_configuracion: {
         Row: {
           actualizado_en: string
@@ -165,6 +793,59 @@ export type Database = {
             columns: ['publicacion_id']
             isOneToOne: false
             referencedRelation: 'area_comun_publicaciones'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      area_comun_encargados_bloque: {
+        Row: {
+          asignacion_id: string
+          asignado_en: string
+          asignado_por: string | null
+          bloque_clave: string
+          usuario_id: string
+        }
+        Insert: {
+          asignacion_id: string
+          asignado_en?: string
+          asignado_por?: string | null
+          bloque_clave: string
+          usuario_id: string
+        }
+        Update: {
+          asignacion_id?: string
+          asignado_en?: string
+          asignado_por?: string | null
+          bloque_clave?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'area_comun_encargados_bloque_asignacion_id_fkey'
+            columns: ['asignacion_id']
+            isOneToOne: true
+            referencedRelation: 'usuarios_roles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_encargados_bloque_asignado_por_fkey'
+            columns: ['asignado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'area_comun_encargados_bloque_bloque_clave_fkey'
+            columns: ['bloque_clave']
+            isOneToOne: false
+            referencedRelation: 'area_comun_bloques'
+            referencedColumns: ['clave']
+          },
+          {
+            foreignKeyName: 'area_comun_encargados_bloque_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
           },
         ]
@@ -4973,6 +5654,14 @@ export type Database = {
         Returns: string
       }
       area_comun_retirar: { Args: { p_plan_id: string }; Returns: undefined }
+      asignar_encargado_area_comun: {
+        Args: {
+          p_asignado_por: string
+          p_bloque_clave: string
+          p_usuario_id: string
+        }
+        Returns: string
+      }
       authz_admin_override_audit: {
         Args: { p_plan_id: string }
         Returns: {
@@ -6236,6 +6925,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reintentar_generacion_asignatura_ia: {
+        Args: {
+          p_asignatura_id: string
+          p_intento_id: string
+          p_safety_identifier: string
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
       reprogramar_intento_chat_ia: {
         Args: {
           p_error?: Json
@@ -6744,6 +7442,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  private: {
+    Enums: {},
+  },
   public: {
     Enums: {
       estado_asignatura: [

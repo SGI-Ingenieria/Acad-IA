@@ -15,6 +15,8 @@ export type ContextoMesaTrabajo = {
   rolClave: string
   facultadId?: string | null
   carreraId?: string | null
+  bloqueClave?: string | null
+  bloqueNombre?: string | null
 }
 
 export type AccionMesaTrabajo = {
