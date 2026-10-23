@@ -71,6 +71,7 @@ export type ResultadoMejorarCampo = {
  * contexto (y datos del plan viajando sin motivo).
  */
 export type AsignaturaMapa = {
+  solo_lectura?: boolean
   id: UUID
   nombre: string
   clave: string | null
@@ -84,6 +85,7 @@ export type AsignaturaMapa = {
 }
 
 export type LineaMapa = {
+  solo_lectura?: boolean
   id: UUID
   nombre: string
   orden: number

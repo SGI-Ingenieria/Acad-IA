@@ -48,9 +48,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { getSessionAuthzSimulation } from '@/data/auth/permissions'
 import { useMesaTrabajo } from '@/data/hooks/useInicio'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
+import { AreaComunInicio } from '@/features/planes/area-comun/AreaComunControl'
 import {
   buildWorkspaceDashboard,
   groupActionsByPlan,
@@ -67,6 +69,8 @@ type InicioSearch = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  AREA_COMUN: 'Área común',
+  ENCARGADO_BLOQUE: 'Encargado de bloque',
   ADMIN: 'Administración',
   VICERRECTOR_ACADEMICO: 'Vicerrectoría académica',
   DIRECTOR_FACULTAD: 'Dirección de facultad',
@@ -76,6 +80,13 @@ const ROLE_LABELS: Record<string, string> = {
   JEFE_CARRERA: 'Jefatura de carrera',
   PROFESOR: 'Profesor',
   EVALUADOR_EXTERNO: 'Evaluación externa',
+}
+
+const BLOCK_LABELS: Record<string, string> = {
+  PENSAMIENTO_COMUNICACION: 'Pensamiento y Comunicación',
+  HUMANISMO_SOCIEDAD: 'Humanismo y Sociedad',
+  LENGUA_EXTRANJERA: 'Lengua Extranjera',
+  EMPRENDIMIENTO_SUSTENTABILIDAD: 'Emprendimiento y Sostenibilidad',
 }
 
 const FASE_LABELS = {
@@ -101,6 +112,7 @@ function contextoId(contexto: ContextoMesaTrabajo) {
     contexto.rolClave,
     contexto.facultadId ?? '',
     contexto.carreraId ?? '',
+    contexto.bloqueClave ?? '',
   ].join(':')
 }
 
@@ -115,6 +127,7 @@ function InicioPage() {
     isAdmin,
     isLoading,
   } = usePermissions()
+  const simulation = getSessionAuthzSimulation(session)
   const { data: catalogos } = useCatalogosPlanes()
 
   const contextos = useMemo(() => {
@@ -126,6 +139,14 @@ function InicioPage() {
         rolClave: role.clave,
         facultadId: role.facultad_id,
         carreraId: role.carrera_id,
+        bloqueClave:
+          role.bloque_clave ??
+          (role.simulada ? simulation?.bloque_clave : null),
+        bloqueNombre:
+          (role.bloque_clave ??
+          (role.simulada ? simulation?.bloque_clave : null))
+            ? BLOCK_LABELS[role.bloque_clave ?? simulation?.bloque_clave ?? '']
+            : null,
       })
     }
     for (const rolClave of roleKeys) {
@@ -133,10 +154,19 @@ function InicioPage() {
         items.push({ rolClave })
       }
     }
+    if (simulation?.rol_clave === 'ENCARGADO_BLOQUE') {
+      items.push({
+        rolClave: 'ENCARGADO_BLOQUE',
+        bloqueClave: simulation.bloque_clave,
+        bloqueNombre:
+          simulation.bloque_nombre ??
+          BLOCK_LABELS[simulation.bloque_clave ?? ''],
+      })
+    }
 
     const unique = new Map(items.map((item) => [contextoId(item), item]))
     return Array.from(unique.values())
-  }, [isAdmin, roleAssignments, roleKeys])
+  }, [isAdmin, roleAssignments, roleKeys, simulation])
 
   const contexto =
     contextos.find((item) => contextoId(item) === search.contexto) ??
@@ -152,7 +182,12 @@ function InicioPage() {
     }
   }, [contexto, navigate, search.contexto])
 
-  const mesa = useMesaTrabajo(contexto)
+  const mesa = useMesaTrabajo(
+    contexto?.rolClave === 'AREA_COMUN' ||
+      contexto?.rolClave === 'ENCARGADO_BLOQUE'
+      ? null
+      : contexto,
+  )
   const userName =
     String(session?.user.user_metadata.nombre_completo ?? '').trim() ||
     session?.user.email?.split('@')[0] ||
@@ -167,6 +202,7 @@ function InicioPage() {
     )
     return [
       ROLE_LABELS[item.rolClave] ?? item.rolClave,
+      item.bloqueNombre,
       carrera?.nombre ?? facultad?.nombre,
     ]
       .filter(Boolean)
@@ -175,6 +211,46 @@ function InicioPage() {
 
   if (isLoading || !contexto) {
     return <InicioSkeleton />
+  }
+
+  if (
+    contexto.rolClave === 'AREA_COMUN' ||
+    contexto.rolClave === 'ENCARGADO_BLOQUE'
+  ) {
+    return (
+      <main className="px-seccion py-region space-y-seccion mx-auto max-w-7xl">
+        <header className="gap-grupo flex flex-wrap items-center justify-between">
+          <h1 className="text-3xl font-bold">
+            {contexto.rolClave === 'AREA_COMUN'
+              ? 'Área común'
+              : `Área común · ${contexto.bloqueNombre ?? 'Encargado de bloque'}`}
+          </h1>
+          {contextos.length > 1 && (
+            <Select
+              value={contextoId(contexto)}
+              onValueChange={(value) =>
+                void navigate({ search: { contexto: value } })
+              }
+            >
+              <SelectTrigger
+                className="w-80"
+                aria-label="Cambiar perspectiva de trabajo"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {contextos.map((item) => (
+                  <SelectItem key={contextoId(item)} value={contextoId(item)}>
+                    {contextoLabel(item)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </header>
+        <AreaComunInicio bloqueClave={contexto.bloqueClave} />
+      </main>
+    )
   }
 
   if (mesa.isError) {
@@ -949,7 +1025,7 @@ function WorkspacePendingActions({
                     <Link
                       to="/planes/$planId"
                       params={{ planId: planGroup.planId }}
-                      className="text-primary mb-control inline-flex items-center gap-micro text-xs hover:underline"
+                      className="text-primary mb-control gap-micro inline-flex items-center text-xs hover:underline"
                     >
                       Ver plan <ArrowRight className="size-3" />
                     </Link>

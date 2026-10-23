@@ -6,6 +6,9 @@ export * from './query/keys'
 export * from './query/queryOptions'
 
 export * from './types/domain'
+export * from './types/areaComun'
+export * from './api/areaComun.api'
+export * from './hooks/useAreaComun'
 
 export * from './api/meta.api'
 export * from './api/inicio.api'

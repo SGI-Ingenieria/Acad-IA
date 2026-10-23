@@ -295,6 +295,71 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
+    // La procedencia y la inmutabilidad se resuelven en la base, no se confían al payload.
+    if ('asignaturas' in peticion.payload) {
+      const { data: materias, error: materiasError } = await supabaseService
+        .from('asignaturas')
+        .select('id,area_comun_incorporacion_id,linea_plan_id')
+        .eq('plan_estudio_id', planId)
+      if (materiasError)
+        throw new HttpError(
+          500,
+          'No se pudo comprobar Área común.',
+          'AREA_COMUN_ERROR',
+          materiasError,
+        )
+      const comunes = new Set(
+        (materias ?? [])
+          .filter((a) => a.area_comun_incorporacion_id)
+          .map((a) => a.id),
+      )
+      const lineasComunes = new Set(
+        (materias ?? [])
+          .filter((a) => a.area_comun_incorporacion_id)
+          .map((a) => a.linea_plan_id),
+      )
+      peticion.payload.asignaturas = peticion.payload.asignaturas.map((a) => ({
+        ...a,
+        solo_lectura: comunes.has(a.id),
+      }))
+      peticion.payload.lineas = peticion.payload.lineas.map((l) => ({
+        ...l,
+        solo_lectura: lineasComunes.has(l.id),
+      }))
+    }
+    const objetivo =
+      'asignatura_id' in peticion.payload
+        ? peticion.payload.asignatura_id
+        : peticion.accion === 'mejorar_campo' &&
+            peticion.payload.entidad === 'asignatura'
+          ? peticion.payload.entidad_id
+          : null
+    if (objetivo) {
+      const { data: materia, error: materiaError } = await supabaseService
+        .from('asignaturas')
+        .select('area_comun_incorporacion_id,plan_estudio_id')
+        .eq('id', objetivo)
+        .maybeSingle()
+      if (materiaError)
+        throw new HttpError(
+          500,
+          'No se pudo comprobar la asignatura.',
+          'AREA_COMUN_ERROR',
+          materiaError,
+        )
+      if (
+        !materia ||
+        materia.plan_estudio_id !== planId ||
+        materia.area_comun_incorporacion_id
+      ) {
+        throw new HttpError(
+          403,
+          'La asignatura no es editable en este plan.',
+          'AREA_COMUN_SOLO_LECTURA',
+        )
+      }
+    }
+
     // El modo agente busca respuestas inmediatas: el frontend manda
     // reasoning_effort 'none', que sólo aceptan los modelos GPT-5.1+ (ver
     // supportsNoReasoning). De ahí que el valor por defecto sea el modelo rápido

@@ -53,6 +53,9 @@ function mapExternalError(err: unknown): string {
   if (code === 'USER_DISABLED') {
     return 'La cuenta está dada de baja.'
   }
+  if (code === 'AUTH_PROVIDER_ERROR') {
+    return (err as Error).message || 'No se pudo emitir la sesión. Intenta de nuevo más tarde.'
+  }
   return 'Correo o contraseña incorrectos.'
 }
 

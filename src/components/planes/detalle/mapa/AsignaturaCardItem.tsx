@@ -12,67 +12,45 @@ import {
 
 import type { Asignatura } from '@/types/plan'
 
+import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
 
 const estadoConfig: Record<
   Asignatura['estado'],
   {
     label: string
-    dot: string
-    soft: string
     icon: React.ComponentType<{ className?: string }>
   }
 > = {
   borrador: {
     label: 'Borrador',
-    dot: 'bg-slate-500',
-    soft: 'bg-slate-100 text-slate-700',
     icon: FileText,
   },
   revisada: {
     label: 'Revisada',
-    dot: 'bg-amber-500',
-    soft: 'bg-amber-100 text-amber-700',
     icon: ScanSearch,
   },
   aprobada: {
     label: 'Aprobada',
-    dot: 'bg-emerald-500',
-    soft: 'bg-emerald-100 text-emerald-700',
     icon: BadgeCheck,
   },
   generando: {
     label: 'Generando',
-    dot: 'bg-sky-500',
-    soft: 'bg-sky-100 text-sky-700',
     icon: LoaderCircle,
   },
   archivada: {
     label: 'Archivada',
-    dot: 'bg-slate-400',
-    soft: 'bg-slate-100 text-slate-600',
     icon: Archive,
   },
   fallida: {
     label: 'Fallida',
-    dot: 'bg-rose-500',
-    soft: 'bg-rose-100 text-rose-700',
     icon: AlertTriangle,
   },
-}
-
-function hexToRgba(hex: string, alpha: number) {
-  const clean = hex.replace('#', '')
-  const bigint = parseInt(clean, 16)
-  const r = (bigint >> 16) & 255
-  const g = (bigint >> 8) & 255
-  const b = bigint & 255
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 export default function AsignaturaCardItem({
@@ -113,37 +91,45 @@ export default function AsignaturaCardItem({
 }) {
   const estado = estadoConfig[asignatura.estado]
   const EstadoIcon = estado.icon
+  const nombreVisible = asignatura.nombre.trim() || 'Nombre pendiente'
+  const bloqueVisible = nombreBloqueAreaComun(asignatura.bloqueAreaComun)
 
   return (
     <div className="group relative shrink-0">
-      <TooltipProvider delayDuration={150}>
+      <>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              draggable
+            <Button
+              type="button"
+              variant="outline"
+              draggable={!asignatura.areaComunOrigenId}
               aria-grabbed={isDragging}
-              aria-label={ariaLabel}
+              aria-label={
+                ariaLabel ??
+                `${nombreVisible}${bloqueVisible ? `, bloque ${bloqueVisible}` : ''}${asignatura.areaComunOrigenId ? ', Área común, solo lectura' : ''}`
+              }
               onDragStart={(e) => onDragStart(e, asignatura.id)}
               onDragEnd={onDragEnd}
               onMouseEnter={onMouseEnter}
               onMouseLeave={onMouseLeave}
               onClick={onClick}
               className={[
-                'group bg-card dark:bg-background relative h-44 w-40 shrink-0 overflow-hidden rounded-[22px] text-left shadow-xs dark:shadow-none',
-                'transition-all duration-300 ease-out',
+                'organic-interactive group bg-card relative block h-44 min-h-44 w-40 min-w-40 shrink-0 overflow-hidden rounded-xl p-0 text-left whitespace-normal shadow-xs',
                 'focus-visible:ring-ring/30 focus-visible:ring-2 focus-visible:outline-none',
-                'cursor-grab active:cursor-grabbing',
+                asignatura.areaComunOrigenId
+                  ? 'cursor-pointer'
+                  : 'cursor-grab active:cursor-grabbing',
                 isActive ? 'scale-[1.03] border-2' : 'border',
-                isDragging
-                  ? 'scale-[0.985] opacity-45 shadow-none'
-                  : 'hover:-translate-y-1 hover:shadow-lg',
+                isDragging ? 'opacity-45 shadow-none' : 'hover:shadow-lg',
               ].join(' ')}
               style={{
-                borderColor: isActive ? lineaColor : hexToRgba(lineaColor, 0.6),
+                borderColor: isActive
+                  ? lineaColor
+                  : asignatura.bloqueAreaComun
+                    ? lineaColor
+                    : `color-mix(in oklch, ${lineaColor} 60%, var(--border))`,
 
-                boxShadow: isActive
-                  ? `0 0 0 2px ${hexToRgba(lineaColor, 0.25)}, 0 8px 20px rgba(0,0,0,0.15)`
-                  : undefined,
+                boxShadow: isActive ? 'var(--shadow-lg)' : undefined,
               }}
             >
               <div className="p-grupo relative flex h-full flex-col">
@@ -151,11 +137,25 @@ export default function AsignaturaCardItem({
                 <div className="gap-relacionado flex items-start justify-between">
                   <div>
                     <div className="gap-micro flex items-center">
-                      <GripVertical
-                        className="text-muted-foreground/70 h-3.5 w-3.5 shrink-0"
-                        aria-hidden="true"
-                      />
+                      {!asignatura.areaComunOrigenId && (
+                        <GripVertical
+                          className="text-muted-foreground/70 h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                      )}
                       <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                      {asignatura.areaComunOrigenId && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-muted-foreground text-[10px] font-semibold">
+                              AC
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Área común · Solo lectura
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     <span className="block max-w-full truncate">
                       {asignatura.clave
@@ -168,9 +168,9 @@ export default function AsignaturaCardItem({
 
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="bg-card/80 dark:bg-background/70 px-relacionado flex h-8 items-center rounded-full shadow-xs backdrop-blur-sm dark:shadow-none">
+                      <span className="flex h-8 items-center">
                         <EstadoIcon className="text-foreground/65 h-3.5 w-3.5" />
-                      </div>
+                      </span>
                     </TooltipTrigger>
                     <TooltipContent side="right">
                       <span className="text-xs font-semibold">
@@ -181,17 +181,10 @@ export default function AsignaturaCardItem({
                 </div>
 
                 {/* titulo */}
-                <div className="mt-grupo flex min-h-18 flex-col items-center text-center">
-                  <h3
-                    className="text-foreground pb-micro overflow-hidden text-sm leading-[1.08]"
-                    style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                    }}
-                  >
-                    {asignatura.nombre}
-                  </h3>
+                <div className="mt-control flex min-h-0 flex-1 flex-col items-center text-center">
+                  <span className="text-foreground pb-micro line-clamp-3 text-sm leading-tight">
+                    {nombreVisible}
+                  </span>
 
                   {/* 🔥 semestre abajo */}
                   {asignatura.ciclo && (
@@ -225,7 +218,7 @@ export default function AsignaturaCardItem({
                   </Tooltip>
                 </div>
               </div>
-            </button>
+            </Button>
           </TooltipTrigger>
 
           <TooltipContent side="bottom">
@@ -244,20 +237,23 @@ export default function AsignaturaCardItem({
         {!isModalOpen && hasSeriacion && onViewSeriacion && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
+              <Button
+                type="button"
+                size="icon"
+                aria-label={`Ver seriación de ${asignatura.nombre}`}
                 onClick={(e) => {
                   e.stopPropagation()
                   onViewSeriacion(asignatura)
                 }}
-                className="bg-primary text-primary-foreground p-relacionado absolute -top-2 -right-2 z-30 rounded-full opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:scale-110"
+                className="organic-interactive bg-primary text-primary-foreground absolute -top-2 -right-2 z-30 rounded-full shadow-lg"
               >
                 <Network size={14} />
-              </button>
+              </Button>
             </TooltipTrigger>
             <TooltipContent>Ver seriación</TooltipContent>
           </Tooltip>
         )}
-      </TooltipProvider>
+      </>
     </div>
   )
 }

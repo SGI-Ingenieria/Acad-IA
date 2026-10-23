@@ -50,6 +50,7 @@ export type FacultadNodo = {
 }
 
 export type Jerarquia = {
+  areaComun: Array<MiembroJerarquia>
   global: Array<MiembroJerarquia>
   facultades: Array<FacultadNodo>
   externos: Array<MiembroJerarquia>
@@ -122,6 +123,7 @@ export function construirJerarquia(
   }
 
   const global: Array<MiembroJerarquia> = []
+  const areaComun: Array<MiembroJerarquia> = []
   const externos: Array<MiembroJerarquia> = []
 
   for (const usuario of usuarios) {
@@ -130,7 +132,11 @@ export function construirJerarquia(
       if (!clave) continue
       const miembro: MiembroJerarquia = { usuario, asignacion }
 
-      if ((ROLES_JERARQUIA.global as ReadonlyArray<string>).includes(clave)) {
+      if (clave === 'AREA_COMUN' || clave === 'ENCARGADO_BLOQUE') {
+        areaComun.push(miembro)
+      } else if (
+        (ROLES_JERARQUIA.global as ReadonlyArray<string>).includes(clave)
+      ) {
         global.push(miembro)
       } else if (
         (ROLES_JERARQUIA.facultad as ReadonlyArray<string>).includes(clave) &&
@@ -189,10 +195,12 @@ export function construirJerarquia(
 
   global.sort(ordenarPorJerarquia)
   externos.sort(ordenarPorJerarquia)
+  areaComun.sort(ordenarPorJerarquia)
 
   const totalMiembros =
     global.length +
     externos.length +
+    areaComun.length +
     facultades.reduce(
       (acc, f) =>
         acc +
@@ -204,5 +212,5 @@ export function construirJerarquia(
       0,
     )
 
-  return { global, facultades, externos, totalMiembros }
+  return { global, facultades, externos, areaComun, totalMiembros }
 }

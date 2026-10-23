@@ -49,6 +49,10 @@ import {
   usePlanesInfinite,
   usePlanesEstadosDisponibles,
 } from '@/data/hooks/usePlans'
+import {
+  AreaComunAcceso,
+  AreaComunInicio,
+} from '@/features/planes/area-comun/AreaComunControl'
 import { PlanVacioFolder } from '@/features/planes/PlanVacioFolder'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { useModoVistaColeccion } from '@/features/preferencias/ModoVistaColeccionContext'
@@ -544,6 +548,7 @@ function RouteComponent() {
                 Planes de estudio
               </h1>
             </div>
+            <AreaComunAcceso />
             {canCreatePlan && (
               <Button asChild className="w-full sm:w-auto">
                 <Link
@@ -562,7 +567,8 @@ function RouteComponent() {
           {hasNoPlanes &&
           !catalogosLoading &&
           !scope.isLoading &&
-          scope.visibleCarreras.length === 0 ? (
+          scope.visibleCarreras.length === 0 &&
+          !has('area_comun.gestionar') ? (
             <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center">
               <div className="border-warning/30 bg-warning/5 gap-grupo p-region flex w-full max-w-md flex-col rounded-xl border text-center">
                 <div className="bg-warning/10 text-warning mx-auto flex h-14 w-14 items-center justify-center rounded-2xl">
@@ -589,6 +595,13 @@ function RouteComponent() {
                   </Link>
                 )}
               </div>
+            </div>
+          ) : hasNoPlanes && has('area_comun.gestionar') ? (
+            <div
+              data-planes-empty
+              className="pb-exhibicion flex min-h-[calc(100vh-12rem)] items-center justify-center"
+            >
+              <AreaComunInicio />
             </div>
           ) : hasNoPlanes ? (
             <div
