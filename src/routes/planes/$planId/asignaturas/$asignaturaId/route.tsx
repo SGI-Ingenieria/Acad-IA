@@ -115,8 +115,8 @@ import {
   useCommentsRead,
 } from '@/features/comentarios/hooks/useCommentsRead'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
-import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
+import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 import {
