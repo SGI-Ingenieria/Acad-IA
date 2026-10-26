@@ -44,6 +44,7 @@ import type {
   ResultadoReorganizarMapa,
   TipoAsignatura,
 } from '@/data'
+import type { EspacioAreaComun } from '@/data/types/areaComun'
 import type { OpcionesAccionAgente } from '@/features/agente'
 import type { Asignatura } from '@/types/plan'
 import type { CSSProperties } from 'react'
@@ -65,6 +66,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -102,7 +104,9 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import { useAreaComun } from '@/data/hooks/useAreaComun'
 import { AccionAgente, useAccionAgente } from '@/features/agente'
+import { AreaComunControl } from '@/features/planes/area-comun/AreaComunControl'
 import { BarraVistaCurricular } from '@/features/planes/curriculo/BarraVistaCurricular'
 import {
   Flip,
@@ -119,6 +123,7 @@ import {
   PALETA_LINEAS_CURRICULARES,
 } from '@/lib/linea-curricular-colors'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 const VisualizadorSeriacionModal = lazy(() =>
@@ -175,13 +180,21 @@ const mapAsignaturasToAsignaturas = (
   return asigApi.map((asig) => {
     return {
       id: asig.id,
+      areaComunOrigenId: asig.area_comun_origen_id,
+      bloqueAreaComun:
+        asig.meta_origen &&
+        typeof asig.meta_origen === 'object' &&
+        !Array.isArray(asig.meta_origen) &&
+        typeof asig.meta_origen.bloque === 'string'
+          ? asig.meta_origen.bloque
+          : null,
       clave: asig.codigo,
       nombre: asig.nombre,
       creditos: asig.creditos ?? 0,
       ciclo: asig.numero_ciclo ?? null,
       lineaCurricularId: asig.linea_plan_id ?? null,
       tipo: asig.tipo,
-      estado: 'borrador',
+      estado: asig.estado ?? 'borrador',
       orden: asig.orden_celda ?? 0,
       // Mapeo directo de los nuevos campos de la API
       hd: asig.horas_academicas ?? 0,
@@ -189,6 +202,96 @@ const mapAsignaturasToAsignaturas = (
       prerrequisito_asignatura_id: asig.prerrequisito_asignatura_id ?? null,
     }
   })
+}
+
+const BLOQUES_AREA_COMUN = [
+  {
+    nombre: 'Pensamiento y Comunicación',
+    alias: [],
+    color: '#5798c9',
+    materias: 2,
+    horas: 96,
+  },
+  {
+    nombre: 'Humanismo y Sociedad',
+    alias: ['Humanismo Sociedad'],
+    color: '#152c72',
+    materias: 6,
+    horas: 192,
+  },
+  {
+    nombre: 'Lengua Extranjera',
+    alias: [],
+    color: '#f43b1c',
+    materias: 2,
+    horas: 144,
+  },
+  {
+    nombre: 'Emprendimiento y Sostenibilidad',
+    alias: ['Emprendimiento Sustentabilidad', 'Emprendimiento Sostenibilidad'],
+    color: '#8d110b',
+    materias: 3,
+    horas: 144,
+  },
+]
+
+function colorBloqueAreaComun(nombre: string | null | undefined) {
+  return BLOQUES_AREA_COMUN.find(
+    (bloque) => bloque.nombre === nombre || bloque.alias.includes(nombre ?? ''),
+  )?.color
+}
+
+function AreaComunBloquesLegend({
+  bloqueFijado,
+  onHighlight,
+  onToggle,
+}: {
+  bloqueFijado: string | null
+  onHighlight: (bloque: string | null) => void
+  onToggle: (bloque: string) => void
+}) {
+  return (
+    <section
+      aria-label="Bloques de Área común"
+      className="gap-x-relacionado gap-y-micro flex flex-wrap items-center justify-end text-xs"
+    >
+      <span className="text-muted-foreground mr-micro text-xs font-medium">
+        Bloques de Área común
+      </span>
+      {BLOQUES_AREA_COMUN.map((bloque) => {
+        const estaFijado = bloqueFijado === bloque.nombre
+        return (
+          <button
+            key={bloque.nombre}
+            type="button"
+            aria-label={`${estaFijado ? 'Quitar resaltado de' : 'Resaltar'} ${bloque.nombre}`}
+            aria-pressed={estaFijado}
+            onMouseEnter={() => onHighlight(bloque.nombre)}
+            onMouseLeave={() => onHighlight(null)}
+            onFocus={() => onHighlight(bloque.nombre)}
+            onBlur={() => onHighlight(null)}
+            onClick={() => onToggle(bloque.nombre)}
+            className="gap-micro focus-visible:ring-ring/50 px-micro py-micro hover:bg-muted/40 inline-flex items-center rounded-md text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <span
+              className="size-3 rounded-sm border-2 transition-colors"
+              style={{
+                borderColor: bloque.color,
+                backgroundColor: estaFijado
+                  ? bloque.color
+                  : `color-mix(in oklch, ${bloque.color} 22%, transparent)`,
+              }}
+              aria-hidden="true"
+            />
+            <span className="text-foreground/85">{bloque.nombre}</span>
+            <span className="text-muted-foreground tabular-nums">
+              {bloque.materias} · {bloque.horas} h
+            </span>
+          </button>
+        )
+      })}
+    </section>
+  )
 }
 
 /** Posición de una asignatura en el mapa: lo mínimo para deshacer un movimiento. */
@@ -371,6 +474,8 @@ function MapaCurricularPage() {
   const { data } = usePlan(planId)
   const capabilities = usePlanCapabilities(data)
   const canEditMapa = capabilities.canEditAsignaturas
+  const { data: areaComun } = useAreaComun(planId)
+  const lineaComunId = areaComun?.incorporacion?.linea_id
   const [totalCiclos, setTotalCiclos] = useState(0)
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
@@ -381,6 +486,9 @@ function MapaCurricularPage() {
     null,
   )
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [electivaActiva, setElectivaActiva] = useState<EspacioAreaComun | null>(
+    null,
+  )
   const { mutateAsync: updateAsignatura } = useUpdateAsignatura()
   const { mutate: updatePlanFields } = useUpdatePlanFields()
   const { mutate: actualizarFaseDiseno } = useUpdatePlanDesignPhase()
@@ -393,6 +501,9 @@ function MapaCurricularPage() {
   const [hoveredAsignaturaId, setHoveredAsignaturaId] = useState<string | null>(
     null,
   )
+  const [bloqueEnHover, setBloqueEnHover] = useState<string | null>(null)
+  const [bloqueFijado, setBloqueFijado] = useState<string | null>(null)
+  const bloqueDestacado = bloqueEnHover ?? bloqueFijado
   const [cardRects, setCardRects] = useState<Partial<Record<string, CardRect>>>(
     {},
   )
@@ -523,6 +634,46 @@ function MapaCurricularPage() {
 
   const ciclosTotales = Number(totalCiclos)
   const ciclosArray = Array.from({ length: ciclosTotales }, (_, i) => i + 1)
+  const esPlanAreaComun = data?.categoria === 'AREA_COMUN'
+  const distribucionComun =
+    areaComun?.distribucion ??
+    areaComun?.borrador?.find(
+      (d) =>
+        d.numero_ciclos === data?.numero_ciclos &&
+        d.tipo_ciclo === data.tipo_ciclo &&
+        !d.carrera_id,
+    ) ??
+    null
+  const espaciosElectivos =
+    esPlanAreaComun || lineaComunId
+      ? (distribucionComun?.espacios.filter((espacio) => espacio.opciones) ??
+        [])
+      : []
+  const idsOpcionesElectivas = new Set(
+    espaciosElectivos.flatMap((espacio) => espacio.opciones ?? []),
+  )
+  const lineaAreaComunId = esPlanAreaComun
+    ? (lineas.find((linea) => linea.nombre.includes('Área curricular común'))
+        ?.id ?? null)
+    : lineaComunId
+  const esOpcionElectiva = (asignatura: Asignatura) =>
+    idsOpcionesElectivas.has(asignatura.areaComunOrigenId ?? asignatura.id)
+  const fuenteElectiva = (id: string) =>
+    asignaturas.find((asignatura) => asignatura.id === id) ??
+    areaComun?.contenido?.asignaturas.find((asignatura) => asignatura.id === id)
+  const horasElectiva = (id: string) => {
+    const asignatura = fuenteElectiva(id)
+    if (!asignatura) return { creditos: 0, hd: 0, hi: 0 }
+    return {
+      creditos: asignatura.creditos ?? 0,
+      hd:
+        'hd' in asignatura ? asignatura.hd : (asignatura.horas_academicas ?? 0),
+      hi:
+        'hi' in asignatura
+          ? asignatura.hi
+          : (asignatura.horas_independientes ?? 0),
+    }
+  }
 
   const maxCicloUsado = asignaturas.reduce(
     (max, a) => Math.max(max, a.ciclo ?? 0),
@@ -580,6 +731,11 @@ function MapaCurricularPage() {
   ): Promise<boolean> => {
     const { cerrarModal = true } = opciones
     if (!canEditMapa) return false
+    if (
+      asignaturas.find((a) => a.id === asignaturaId)?.areaComunOrigenId ||
+      (lineaComunId && nuevosDatos.lineaCurricularId === lineaComunId)
+    )
+      return false
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
       ? await requestAdminOverrideReason(
           'modificar una asignatura fuera de la etapa normal del plan',
@@ -684,6 +840,16 @@ function MapaCurricularPage() {
     } = {},
   ): Promise<boolean> => {
     if (!canEditMapa || movimientos.length === 0) return false
+    if (
+      movimientos.some(
+        (m) =>
+          asignaturas.find((a) => a.id === m.id)?.areaComunOrigenId ||
+          (lineaComunId && m.lineaCurricularId === lineaComunId),
+      )
+    ) {
+      notify.error('Área común conserva sus materias y ubicaciones oficiales.')
+      return false
+    }
 
     const adminOverrideReason =
       opciones.adminOverrideReason !== undefined
@@ -838,6 +1004,7 @@ function MapaCurricularPage() {
     lineas.length > 0 ? lineas.map((l) => l.color) : PALETA_LINEAS_CURRICULARES
 
   const asignaturaAMapa = (asignatura: Asignatura): AsignaturaMapa => ({
+    solo_lectura: Boolean(asignatura.areaComunOrigenId),
     id: asignatura.id,
     nombre: asignatura.nombre,
     clave: asignatura.clave || null,
@@ -852,6 +1019,7 @@ function MapaCurricularPage() {
 
   const contextoMapa = (): ContextoMapa => ({
     lineas: lineas.map((linea) => ({
+      solo_lectura: linea.id === lineaComunId,
       id: linea.id,
       nombre: linea.nombre,
       orden: linea.orden,
@@ -1315,8 +1483,11 @@ function MapaCurricularPage() {
 
   // --- Selectores/Cálculos ---
   const getTotalesCiclo = (cicloNumero: number) => {
-    return asignaturas
-      .filter((m) => m.ciclo === cicloNumero)
+    const totales = asignaturas
+      .filter(
+        (m) =>
+          m.ciclo === cicloNumero && !(esPlanAreaComun && esOpcionElectiva(m)),
+      )
       .reduce(
         (acc, m) => ({
           cr: acc.cr + (m.creditos || 0),
@@ -1325,11 +1496,27 @@ function MapaCurricularPage() {
         }),
         { cr: 0, hd: 0, hi: 0 },
       )
+    if (esPlanAreaComun) {
+      for (const espacio of espaciosElectivos.filter(
+        (item) => item.numero_ciclo === cicloNumero,
+      )) {
+        const opcion = horasElectiva(espacio.opciones?.[0] ?? '')
+        totales.cr += opcion.creditos
+        totales.hd += opcion.hd
+        totales.hi += opcion.hi
+      }
+    }
+    return totales
   }
 
   const getSubtotalLinea = (lineaId: string) => {
-    return asignaturas
-      .filter((m) => m.lineaCurricularId === lineaId && m.ciclo !== null) // Aseguramos que pertenezca a la línea Y tenga ciclo
+    const totales = asignaturas
+      .filter(
+        (m) =>
+          m.lineaCurricularId === lineaId &&
+          m.ciclo !== null &&
+          !(esPlanAreaComun && esOpcionElectiva(m)),
+      ) // Mantiene las opciones del catálogo fuera de los totales curriculares.
       .reduce(
         (acc, m) => ({
           cr: acc.cr + (m.creditos || 0),
@@ -1338,6 +1525,15 @@ function MapaCurricularPage() {
         }),
         { cr: 0, hd: 0, hi: 0 },
       )
+    if (esPlanAreaComun && lineaId === lineaAreaComunId) {
+      for (const espacio of espaciosElectivos) {
+        const opcion = horasElectiva(espacio.opciones?.[0] ?? '')
+        totales.cr += opcion.creditos
+        totales.hd += opcion.hd
+        totales.hi += opcion.hi
+      }
+    }
+    return totales
   }
 
   const limpiarArrastre = () => {
@@ -1345,7 +1541,10 @@ function MapaCurricularPage() {
   }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
-    if (!canEditMapa) {
+    if (
+      !canEditMapa ||
+      asignaturas.find((a) => a.id === id)?.areaComunOrigenId
+    ) {
       e.preventDefault()
       return
     }
@@ -1400,21 +1599,28 @@ function MapaCurricularPage() {
     }
   }, [])
 
-  const stats = useMemo(
-    () =>
-      asignaturas.reduce(
-        (acc, m) => {
-          if (m.ciclo !== null) {
-            acc.cr += m.creditos || 0
-            acc.hd += m.hd || 0
-            acc.hi += m.hi || 0
-          }
-          return acc
-        },
-        { cr: 0, hd: 0, hi: 0 },
-      ),
-    [asignaturas],
-  )
+  const stats = (() => {
+    const totales = asignaturas.reduce(
+      (acc, m) => {
+        if (m.ciclo !== null && !(esPlanAreaComun && esOpcionElectiva(m))) {
+          acc.cr += m.creditos || 0
+          acc.hd += m.hd || 0
+          acc.hi += m.hi || 0
+        }
+        return acc
+      },
+      { cr: 0, hd: 0, hi: 0 },
+    )
+    if (esPlanAreaComun) {
+      for (const espacio of espaciosElectivos) {
+        const opcion = horasElectiva(espacio.opciones?.[0] ?? '')
+        totales.cr += opcion.creditos
+        totales.hd += opcion.hd
+        totales.hi += opcion.hi
+      }
+    }
+    return totales
+  })()
 
   const generateExcel = async () => {
     try {
@@ -1663,6 +1869,7 @@ function MapaCurricularPage() {
           ) : undefined
         }
       >
+        {data && <AreaComunControl plan={data} editable={canEditMapa} />}
         <span className="text-foreground/80 text-2l font-medium">
           {nombreTipoCiclo(data?.tipo_ciclo)}s
         </span>
@@ -1744,6 +1951,16 @@ function MapaCurricularPage() {
           <TooltipContent>Exportar a Excel</TooltipContent>
         </Tooltip>
       </BarraVistaCurricular>
+
+      {data?.categoria === 'AREA_COMUN' && (
+        <AreaComunBloquesLegend
+          bloqueFijado={bloqueFijado}
+          onHighlight={setBloqueEnHover}
+          onToggle={(bloque) =>
+            setBloqueFijado((actual) => (actual === bloque ? null : bloque))
+          }
+        />
+      )}
 
       <div className="pb-seccion overflow-x-auto">
         <div ref={mapOverlayRef} className="relative">
@@ -1854,61 +2071,128 @@ function MapaCurricularPage() {
                         .filter(
                           (m) =>
                             m.ciclo === cicloNumero &&
-                            m.lineaCurricularId === linea.id,
+                            m.lineaCurricularId === linea.id &&
+                            !esOpcionElectiva(m),
                         )
-                        .map((m) => (
-                          <div
-                            key={m.id}
-                            data-flip-id={m.id}
-                            ref={(element) => {
-                              cardRefs.current[m.id] = element
-                            }}
-                            onMouseEnter={() => setHoveredAsignaturaId(m.id)}
-                            onMouseLeave={() => setHoveredAsignaturaId(null)}
-                            className={[
-                              'w-fit shrink-0 transition-opacity duration-200',
+                        .map((m) =>
+                          (() => {
+                            const bloqueMateria = BLOQUES_AREA_COMUN.find(
+                              (bloque) =>
+                                bloque.nombre === m.bloqueAreaComun ||
+                                bloque.alias.includes(m.bloqueAreaComun ?? ''),
+                            )
+                            const coincideBloque =
+                              bloqueDestacado !== null &&
+                              bloqueMateria?.nombre === bloqueDestacado
+                            const atenuadaPorBloque =
+                              data?.categoria === 'AREA_COMUN' &&
+                              bloqueDestacado !== null &&
+                              !coincideBloque
+                            const atenuadaPorCadena = Boolean(
                               highlightedChainIds &&
-                              !highlightedChainIds.has(m.id)
-                                ? 'opacity-25'
-                                : 'opacity-100',
-                            ].join(' ')}
-                          >
-                            <AsignaturaCardItem
-                              asignatura={m}
-                              lineaColor={linea.color || '#1976d2'}
-                              lineaNombre={linea.nombre}
-                              isDragging={draggedAsignatura === m.id}
-                              onDragStart={handleDragStart}
-                              onDragEnd={handleDragEnd}
-                              onClick={() => {
-                                if (!canEditMapa) return
-                                setEditingData(m)
-                                setIsEditModalOpen(true)
-                              }}
-                              onViewSeriacion={handleViewSeriacion}
-                              hasSeriacion={
-                                !!m.prerrequisito_asignatura_id ||
-                                asignaturas.some(
-                                  (a) => a.prerrequisito_asignatura_id === m.id,
-                                )
-                              }
-                            />
-                          </div>
-                        ))}
+                              !highlightedChainIds.has(m.id),
+                            )
+                            return (
+                              <div
+                                key={m.id}
+                                data-flip-id={m.id}
+                                ref={(element) => {
+                                  cardRefs.current[m.id] = element
+                                }}
+                                onMouseEnter={() =>
+                                  setHoveredAsignaturaId(m.id)
+                                }
+                                onMouseLeave={() =>
+                                  setHoveredAsignaturaId(null)
+                                }
+                                className={[
+                                  'w-fit shrink-0 transition-opacity duration-200',
+                                  atenuadaPorBloque || atenuadaPorCadena
+                                    ? 'opacity-25'
+                                    : 'opacity-100',
+                                ].join(' ')}
+                              >
+                                <AsignaturaCardItem
+                                  asignatura={m}
+                                  lineaColor={
+                                    data?.categoria === 'AREA_COMUN'
+                                      ? (colorBloqueAreaComun(
+                                          m.bloqueAreaComun,
+                                        ) ?? linea.color)
+                                      : linea.color || '#1976d2'
+                                  }
+                                  lineaNombre={linea.nombre}
+                                  isActive={coincideBloque}
+                                  isDragging={draggedAsignatura === m.id}
+                                  onDragStart={handleDragStart}
+                                  onDragEnd={handleDragEnd}
+                                  onClick={() => {
+                                    if (m.areaComunOrigenId) {
+                                      void navigate({
+                                        to: '/planes/$planId/asignaturas/$asignaturaId',
+                                        params: { planId, asignaturaId: m.id },
+                                      })
+                                      return
+                                    }
+                                    if (!canEditMapa) return
+                                    setEditingData(m)
+                                    setIsEditModalOpen(true)
+                                  }}
+                                  onViewSeriacion={handleViewSeriacion}
+                                  hasSeriacion={
+                                    !!m.prerrequisito_asignatura_id ||
+                                    asignaturas.some(
+                                      (a) =>
+                                        a.prerrequisito_asignatura_id === m.id,
+                                    )
+                                  }
+                                />
+                              </div>
+                            )
+                          })(),
+                        )}
 
-                      {canEditMapa && unassignedAsignaturas.length > 0 && (
-                        <CeldaAgregarAsignatura
-                          disponibles={unassignedAsignaturas}
-                          ariaLabel={`Asignar una asignatura pendiente a ${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
-                          opcionesAgente={opcionesCelda(linea, cicloNumero)}
-                          onSelect={(asignaturaId) =>
-                            void procesarCambioAsignatura(asignaturaId, {
-                              ciclo: cicloNumero,
-                              lineaCurricularId: linea.id,
-                            })
-                          }
-                        />
-                      )}
+                      {linea.id === lineaAreaComunId &&
+                        espaciosElectivos
+                          .filter(
+                            (espacio) => espacio.numero_ciclo === cicloNumero,
+                          )
+                          .map((espacio, index) => (
+                            <button
+                              key={espacio.clave}
+                              type="button"
+                              onClick={() => setElectivaActiva(espacio)}
+                              className="border-primary/35 bg-card hover:border-primary organic-interactive p-grupo flex h-44 min-h-44 w-40 min-w-40 shrink-0 flex-col items-center justify-between rounded-xl border text-center"
+                              aria-label={`Abrir ${espacio.nombre ?? `Electiva ${index + 1}`} en ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
+                            >
+                              <span className="text-muted-foreground block text-xs">
+                                {formatCiclo(data?.tipo_ciclo, cicloNumero)}
+                              </span>
+                              <span className="text-foreground line-clamp-3 flex flex-1 items-center justify-center font-semibold">
+                                {espacio.nombre ?? `Electiva ${index + 1}`}
+                              </span>
+                              <span className="text-muted-foreground text-xs">
+                                {espacio.opciones?.length ?? 0} opciones · Ver
+                                catálogo
+                              </span>
+                            </button>
+                          ))}
+
+                      {canEditMapa &&
+                        linea.id !== lineaComunId &&
+                        unassignedAsignaturas.length > 0 && (
+                          <CeldaAgregarAsignatura
+                            disponibles={unassignedAsignaturas}
+                            ariaLabel={`Asignar una asignatura pendiente a ${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
+                            opcionesAgente={opcionesCelda(linea, cicloNumero)}
+                            onSelect={(asignaturaId) =>
+                              void procesarCambioAsignatura(asignaturaId, {
+                                ciclo: cicloNumero,
+                                lineaCurricularId: linea.id,
+                              })
+                            }
+                          />
+                        )}
                     </div>
                   ))}
 
@@ -2067,6 +2351,72 @@ function MapaCurricularPage() {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={electivaActiva !== null}
+        onOpenChange={(open) => !open && setElectivaActiva(null)}
+      >
+        {electivaActiva && (
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {electivaActiva.nombre ?? 'Asignaturas electivas'}
+              </DialogTitle>
+              <DialogDescription>
+                {formatCiclo(data?.tipo_ciclo, electivaActiva.numero_ciclo)} ·{' '}
+                {electivaActiva.opciones?.length ?? 0} opciones disponibles
+              </DialogDescription>
+            </DialogHeader>
+            <div className="gap-grupo flex flex-wrap">
+              {(electivaActiva.opciones ?? []).map((id) => {
+                const original = fuenteElectiva(id)
+                const materia = asignaturas.find(
+                  (asignatura) =>
+                    asignatura.id === id || asignatura.areaComunOrigenId === id,
+                )
+                const nombre =
+                  materia?.nombre ?? original?.nombre ?? 'Asignatura electiva'
+                const codigo =
+                  materia?.clave ??
+                  (original && 'codigo' in original
+                    ? original.codigo
+                    : undefined)
+                const seleccionada =
+                  areaComun?.incorporacion?.electivas[electivaActiva.clave] ===
+                  id
+                const carga = horasElectiva(id)
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    disabled={!materia}
+                    aria-label={`Abrir ${nombre}${codigo ? `, ${codigo}` : ''}${seleccionada ? ', elegida en este plan' : ''}`}
+                    onClick={() => {
+                      if (!materia) return
+                      setElectivaActiva(null)
+                      setEditingData(materia)
+                      setIsEditModalOpen(true)
+                    }}
+                    className="organic-interactive bg-card border-border hover:border-primary focus-visible:ring-ring/30 p-grupo flex h-44 min-h-44 w-40 min-w-40 shrink-0 flex-col items-center justify-between overflow-hidden rounded-xl border text-center focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="text-muted-foreground flex w-full items-center justify-between text-xs">
+                      <span className="truncate">{codigo ?? 'Sin clave'}</span>
+                      {seleccionada && <span aria-hidden="true">✓</span>}
+                    </span>
+                    <span className="text-foreground line-clamp-3 flex flex-1 items-center justify-center text-sm leading-tight font-semibold">
+                      {nombre}
+                    </span>
+                    <span className="text-muted-foreground flex w-full items-end justify-between text-xs">
+                      <span>{carga.creditos} CR</span>
+                      <span>{carga.hd + carga.hi} h</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
 
       {/* Asignaturas sin asignar: bandeja plana, también es dropzone para desasignar */}
       {unassignedAsignaturas.length > 0 && (

@@ -30,6 +30,7 @@ const AssignRoleSchema = z
     rol_id: z.string().uuid('Rol inválido.'),
     facultad_id: z.string().uuid('Facultad inválida.').nullable().optional(),
     carrera_id: z.string().uuid('Carrera inválida.').nullable().optional(),
+    bloque_clave: z.string().trim().min(1).nullable().optional(),
     // Cuando es true, ejecuta el "nombramiento": retira al titular previo del
     // mismo rol+alcance y asigna al nuevo de forma atómica (ver RPC).
     reemplazar: z.boolean().optional(),
@@ -40,7 +41,7 @@ const AssignRoleSchema = z
 
 // Embed compartido para devolver la asignación con su rol/facultad/carrera.
 const ROLE_EMBED_SELECT =
-  'id, usuario_id, rol_id, facultad_id, carrera_id, creado_en, asignado_por, roles(id, clave, nombre, descripcion, nivel_jerarquico, alcance_default), facultades(id, nombre, nombre_corto, prefijo), carreras(id, nombre, nombre_corto, facultad_id, nivel)'
+  'id, usuario_id, rol_id, facultad_id, carrera_id, creado_en, asignado_por, roles(id, clave, nombre, descripcion, nivel_jerarquico, alcance_default), facultades(id, nombre, nombre_corto, prefijo), carreras(id, nombre, nombre_corto, facultad_id, nivel), area_comun_encargados_bloque(bloque_clave,area_comun_bloques(nombre))'
 
 const ReasignarSchema = z.object({
   destino_id: z.string().uuid('Usuario destino inválido.'),
@@ -58,6 +59,7 @@ const SimulacionRolSchema = z.object({
   carrera_id: z.string().uuid('Carrera inválida.').nullable().optional(),
   plan_estudio_id: z.string().uuid('Plan inválido.').nullable().optional(),
   asignatura_id: z.string().uuid('Asignatura inválida.').nullable().optional(),
+  bloque_clave: z.string().trim().min(1).nullable().optional(),
   responsable_rol: ResponsableRolSchema.optional(),
 })
 
@@ -144,7 +146,8 @@ type CatalogRole = {
   id: string
   clave: string
   nivel_jerarquico: number
-  alcance_default: 'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo'
+  alcance_default:
+    'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo' | 'area_comun'
 }
 
 type CatalogFacultad = {
@@ -594,7 +597,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         console.log(
           '[usuarios] Route matched: GET /usuarios/simulacion/catalogos',
         )
-        const [rolesRes, facultadesRes, carrerasRes] = await Promise.all([
+        const [rolesRes, facultadesRes, carrerasRes, bloquesRes] =
+          await Promise.all([
           supabase
             .from('roles')
             .select(
@@ -611,9 +615,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
             .select('id, facultad_id, nombre, nombre_corto, nivel, activa')
             .eq('activa', true)
             .order('nombre', { ascending: true }),
-        ])
+            supabase
+              .from('area_comun_bloques')
+              .select('clave, nombre, color, asignaturas_referencia, horas_referencia, orden')
+              .order('orden', { ascending: true }),
+          ])
 
-        for (const result of [rolesRes, facultadesRes, carrerasRes]) {
+        for (const result of [
+          rolesRes,
+          facultadesRes,
+          carrerasRes,
+          bloquesRes,
+        ]) {
           if (result.error) {
             console.log(
               '[usuarios] simulation catalog lookup error:',
@@ -628,6 +641,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           permisos: [],
           facultades: facultadesRes.data ?? [],
           carreras: carrerasRes.data ?? [],
+          bloques_area_comun: bloquesRes.data ?? [],
           gestion: {
             roles_asignables: [],
             facultades_gestionables: [],
@@ -720,11 +734,42 @@ Deno.serve(async (req: Request): Promise<Response> => {
         let carreraId = parsed.data.carrera_id ?? null
         let planId = parsed.data.plan_estudio_id ?? null
         const asignaturaId = parsed.data.asignatura_id ?? null
+        const bloqueClave = parsed.data.bloque_clave ?? null
 
         let facultadNombre: string | null = null
         let carreraNombre: string | null = null
         let planNombre: string | null = null
         let asignaturaNombre: string | null = null
+        let bloqueNombre: string | null = null
+
+        if (rol.alcance_default === 'area_comun_bloque') {
+          if (rol.clave !== 'ENCARGADO_BLOQUE' || !bloqueClave) {
+            throw new HttpError(
+              422,
+              'Selecciona un bloque de Área común.',
+              'VALIDATION_ERROR',
+            )
+          }
+          const { data: bloque, error: bloqueError } = await supabase
+            .from('area_comun_bloques')
+            .select('clave, nombre')
+            .eq('clave', bloqueClave)
+            .single()
+          if (bloqueError || !bloque) {
+            throw new HttpError(
+              404,
+              'Bloque de Área común no encontrado.',
+              'NOT_FOUND',
+            )
+          }
+          bloqueNombre = bloque.nombre
+        } else if (bloqueClave) {
+          throw new HttpError(
+            422,
+            'El rol seleccionado no admite un bloque.',
+            'VALIDATION_ERROR',
+          )
+        }
 
         if (asignaturaId) {
           const { data: asignatura, error: asignaturaError } = await supabase
@@ -904,6 +949,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
           plan_nombre: planNombre,
           asignatura_id: asignaturaId,
           asignatura_nombre: asignaturaNombre,
+          bloque_clave: bloqueClave,
+          bloque_nombre: bloqueNombre,
           responsable_rol:
             rol.clave === 'PROFESOR'
               ? (parsed.data.responsable_rol ?? 'PROFESOR_RESPONSABLE')
@@ -941,7 +988,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.log('[usuarios] Route matched: GET /usuarios/catalogos')
       const callerId = await requirePermission(req, supabase, 'usuarios.ver')
 
-      const [rolesRes, permisosRes, facultadesRes, carrerasRes] =
+      const [rolesRes, permisosRes, facultadesRes, carrerasRes, bloquesRes] =
         await Promise.all([
           supabase
             .from('roles')
@@ -964,6 +1011,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
             .select('id, facultad_id, nombre, nombre_corto, nivel, activa')
             .eq('activa', true)
             .order('nombre', { ascending: true }),
+          supabase
+            .from('area_comun_bloques')
+            .select('clave, nombre, color, asignaturas_referencia, horas_referencia, orden')
+            .order('orden', { ascending: true }),
         ])
 
       for (const result of [
@@ -971,6 +1022,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         permisosRes,
         facultadesRes,
         carrerasRes,
+        bloquesRes,
       ]) {
         if (result.error) {
           console.log('[usuarios] catalog lookup error:', result.error.message)
@@ -987,6 +1039,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         permisos: permisosRes.data ?? [],
         facultades,
         carreras,
+        bloques_area_comun: bloquesRes.data ?? [],
         gestion: await buildCatalogGestion(
           supabase,
           callerId,
@@ -1689,8 +1742,36 @@ Deno.serve(async (req: Request): Promise<Response> => {
         rol_id,
         facultad_id = null,
         carrera_id = null,
+        bloque_clave = null,
         reemplazar = false,
       } = parsed.data
+
+      const { data: selectedRole, error: selectedRoleError } = await supabase
+        .from('roles')
+        .select('clave,alcance_default')
+        .eq('id', rol_id)
+        .maybeSingle()
+      if (selectedRoleError || !selectedRole) {
+        throw new HttpError(404, 'Rol no encontrado.', 'NOT_FOUND')
+      }
+      const requiresBlock = selectedRole.alcance_default === 'area_comun_bloque'
+      if (
+        requiresBlock &&
+        (!bloque_clave || selectedRole.clave !== 'ENCARGADO_BLOQUE')
+      ) {
+        throw new HttpError(
+          422,
+          'Selecciona un bloque de Área común.',
+          'VALIDATION_ERROR',
+        )
+      }
+      if (!requiresBlock && bloque_clave) {
+        throw new HttpError(
+          422,
+          'El rol seleccionado no admite un bloque.',
+          'VALIDATION_ERROR',
+        )
+      }
 
       await assertCanManageUser(supabase, callerId, id)
       await assertCanManageRole(
@@ -1700,6 +1781,46 @@ Deno.serve(async (req: Request): Promise<Response> => {
         facultad_id,
         carrera_id,
       )
+
+      if (requiresBlock) {
+        if (reemplazar) {
+          throw new HttpError(
+            422,
+            'El rol Encargado de bloque no usa nombramiento único.',
+            'VALIDATION_ERROR',
+          )
+        }
+        const { data: block, error: blockError } = await supabase
+          .from('area_comun_bloques')
+          .select('clave')
+          .eq('clave', bloque_clave!)
+          .maybeSingle()
+        if (blockError || !block) {
+          throw new HttpError(
+            404,
+            'Bloque de Área común no encontrado.',
+            'NOT_FOUND',
+          )
+        }
+        const { data: asignacionId, error: assignError } = await supabase.rpc(
+          'asignar_encargado_area_comun',
+          {
+            p_usuario_id: id,
+            p_bloque_clave: block.clave,
+            p_asignado_por: callerId,
+          },
+        )
+        if (assignError) {
+          throw new HttpError(500, assignError.message, 'DB_ERROR')
+        }
+        const { data, error } = await supabase
+          .from('usuarios_roles')
+          .select(ROLE_EMBED_SELECT)
+          .eq('id', asignacionId ?? '')
+          .single()
+        if (error) throw new HttpError(500, error.message, 'DB_ERROR')
+        return sendSuccess(data, 201)
+      }
 
       // Nombramiento: swap atómico (retira titular previo + asigna nuevo).
       if (reemplazar) {

@@ -63,6 +63,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -87,7 +94,8 @@ import {
   requestAdminOverrideReason,
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
-import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { requirePlanPermission } from '@/data/auth/routeGuards'
+import { useAreaComunRealtime } from '@/data/hooks/useAreaComun'
 import { useSession } from '@/data/hooks/useAuth'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
@@ -107,6 +115,7 @@ import {
   useCommentsRead,
 } from '@/features/comentarios/hooks/useCommentsRead'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
+import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
@@ -118,6 +127,13 @@ import {
 
 type SubjectContextualPanel =
   'comentarios' | 'ia' | 'responsables' | 'revision' | 'historial'
+
+const bloquesAreaComun = [
+  'Pensamiento y Comunicación',
+  'Humanismo y Sociedad',
+  'Lengua Extranjera',
+  'Emprendimiento y Sostenibilidad',
+] as const
 
 /**
  * Un usuario puede llegar a esta ruta viendo una asignatura a la que solo tiene
@@ -143,8 +159,8 @@ function SubjectNotFoundPage() {
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
-  beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, [
+  beforeLoad: ({ context, params }) =>
+    requirePlanPermission(context.queryClient, params.planId, [
       'asignaturas.ver',
       'planes.ver',
     ]),
@@ -522,6 +538,7 @@ function AsignaturaLayout() {
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
   const { origen, soloAsignatura } = Route.useSearch()
+  useAreaComunRealtime(planId)
   const { data: plan } = usePlan(planId)
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditAsignatura = capabilities.canEditAsignaturas
@@ -843,6 +860,11 @@ function AsignaturaLayout() {
           )}
 
           <div className="gap-grupo flex flex-col">
+            {asignaturaApi.area_comun_origen_id && (
+              <p className="text-muted-foreground text-sm">
+                Área común · Contenido publicado de solo lectura
+              </p>
+            )}
             {/* Título Editable (Texto blanco controlado dentro del componente) */}
             <div className="-ml-relacionado">
               <InlineEditTitle
@@ -862,6 +884,51 @@ function AsignaturaLayout() {
                 <Tag size={12} className="text-muted-foreground" />
                 {asignaturaApi.tipo}
               </Badge>
+
+              {plan?.categoria === 'AREA_COMUN' &&
+                !asignaturaApi.area_comun_origen_id &&
+                canEditAsignatura &&
+                permissions.has('area_comun.gestionar') && (
+                  <Select
+                    value={
+                      typeof asignaturaApi.meta_origen === 'object' &&
+                      asignaturaApi.meta_origen !== null &&
+                      !Array.isArray(asignaturaApi.meta_origen) &&
+                      typeof asignaturaApi.meta_origen.bloque === 'string'
+                        ? (nombreBloqueAreaComun(
+                            asignaturaApi.meta_origen.bloque,
+                          ) ?? '')
+                        : ''
+                    }
+                    onValueChange={(bloque) => {
+                      const meta =
+                        typeof asignaturaApi.meta_origen === 'object' &&
+                        asignaturaApi.meta_origen !== null &&
+                        !Array.isArray(asignaturaApi.meta_origen)
+                          ? asignaturaApi.meta_origen
+                          : {}
+                      updateAsignatura.mutate({
+                        asignaturaId,
+                        patch: { meta_origen: { ...meta, bloque } },
+                      })
+                    }}
+                    disabled={updateAsignatura.isPending}
+                  >
+                    <SelectTrigger
+                      aria-label="Bloque de conocimiento de Área común"
+                      className="h-8 w-auto min-w-48"
+                    >
+                      <SelectValue placeholder="Asignar bloque" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bloquesAreaComun.map((bloque) => (
+                        <SelectItem key={bloque} value={bloque}>
+                          {bloque}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
               {/* Badges Editables (Texto blanco controlado dentro de los componentes) */}
 

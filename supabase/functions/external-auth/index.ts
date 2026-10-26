@@ -132,6 +132,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       })
 
       if (error || !data.session || !data.user) {
+        if (error && error.status >= 500) {
+          console.error('[external-auth] signInWithPassword provider error:', {
+            status: error.status,
+            code: error.code,
+          })
+          throw new HttpError(
+            503,
+            'El servicio de inicio de sesión no pudo emitir la sesión. Intenta de nuevo o avisa a un administrador.',
+            'AUTH_PROVIDER_ERROR',
+          )
+        }
         throw new HttpError(
           401,
           'Correo o contraseña incorrectos.',

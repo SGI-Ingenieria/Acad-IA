@@ -1,4 +1,8 @@
 export const qk = {
+  areaComunRoot: () => ['areaComun'] as const,
+  areaComun: (planId: string) => [...qk.areaComunRoot(), planId] as const,
+  areaComunDashboard: (planId: string, asignaturaIds: Array<string>) =>
+    [...qk.areaComun(planId), 'dashboard', [...asignaturaIds].sort()] as const,
   auth: ['auth'] as const,
   session: () => ['auth', 'session'] as const,
   meProfile: () => ['auth', 'meProfile'] as const,

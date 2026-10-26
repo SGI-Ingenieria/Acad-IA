@@ -158,6 +158,7 @@ type RoleFormValues = {
   rolId: string
   facultadId: string
   carreraId: string
+  bloqueClave: string
 }
 
 type DraftRol = {
@@ -470,6 +471,10 @@ function RouteComponent() {
       rol_id: values.rolId,
       facultad_id: facultadId,
       carrera_id: carreraId,
+      bloque_clave:
+        selectedRol.alcance_default === 'area_comun_bloque'
+          ? values.bloqueClave
+          : null,
     }
 
     // Rol singleton con titular vigente → confirmar proceso de nombramiento.
@@ -1161,6 +1166,9 @@ function NuevoUsuarioDialog({
     facultadesPropiasIds,
     carrerasPropiasIds,
   } = useGestionCatalogos()
+  const rolesAsignablesAlta = rolesAsignables.filter(
+    (rol) => rol.alcance_default !== 'area_comun_bloque',
+  )
 
   // Builder transitorio de roles a asignar tras crear el usuario: estado
   // efímero del diálogo (se descarta al desmontarse al cerrar).
@@ -1419,12 +1427,12 @@ function NuevoUsuarioDialog({
                 >
                   <SelectTrigger
                     className="w-full"
-                    disabled={rolesAsignables.length === 0}
+                    disabled={rolesAsignablesAlta.length === 0}
                   >
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {rolesAsignables.map((rol) => (
+                    {rolesAsignablesAlta.map((rol) => (
                       <SelectItem key={rol.id} value={rol.id}>
                         {rol.nombre}
                       </SelectItem>
@@ -1571,7 +1579,12 @@ function AsignarRolDialog({
     catalogos?.roles.find((rol) => rol.id === rolId)
 
   const form = useAppForm({
-    defaultValues: { rolId: '', facultadId: '', carreraId: '' },
+    defaultValues: {
+      rolId: '',
+      facultadId: '',
+      carreraId: '',
+      bloqueClave: '',
+    },
     // El cierre en éxito y el flujo de nombramiento los decide la página
     // (puede abrir la confirmación de nombramiento sin cerrar este diálogo).
     onSubmit: async ({ value }) => onSubmit(value),
@@ -1582,6 +1595,7 @@ function AsignarRolDialog({
     state.values.facultadId,
   ])
   const selectedRol = findRol(rolIdValue)
+  const requiresBloque = selectedRol?.alcance_default === 'area_comun_bloque'
 
   const carrerasFiltradas = useMemo(() => {
     if (!facultadIdValue) return carrerasGestionables
@@ -1643,6 +1657,7 @@ function AsignarRolDialog({
               onChange: () => {
                 form.setFieldValue('facultadId', '')
                 form.setFieldValue('carreraId', '')
+                form.setFieldValue('bloqueClave', '')
               },
             }}
           >
@@ -1852,9 +1867,62 @@ function AsignarRolDialog({
             </div>
           )}
 
+          {requiresBloque && (
+            <form.AppField
+              name="bloqueClave"
+              validators={{
+                onChangeListenTo: ['rolId'],
+                onChange: ({ value }) =>
+                  !value ? 'Selecciona un bloque de Área común.' : undefined,
+              }}
+            >
+              {(field) => {
+                const { invalid, error } = selectShellProps(field)
+                return (
+                  <div className="space-y-relacionado">
+                    <Label htmlFor={field.name}>Bloque de Área común</Label>
+                    <Select
+                      value={field.state.value || undefined}
+                      onValueChange={(bloqueClave) => {
+                        field.handleChange(bloqueClave)
+                        field.handleBlur()
+                      }}
+                    >
+                      <SelectTrigger
+                        id={field.name}
+                        className="w-full"
+                        aria-invalid={invalid}
+                        aria-describedby={
+                          invalid ? `${field.name}-error` : undefined
+                        }
+                      >
+                        <SelectValue placeholder="Seleccionar bloque" />
+                      </SelectTrigger>
+                      <SelectContent
+                        hasItems={(catalogos?.bloques_area_comun?.length ?? 0) > 0}
+                      >
+                        {(catalogos?.bloques_area_comun ?? []).map((bloque) => (
+                          <SelectItem key={bloque.clave} value={bloque.clave}>
+                            {bloque.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {invalid && (
+                      <p id={`${field.name}-error`} className="text-destructive text-sm">
+                        {error}
+                      </p>
+                    )}
+                  </div>
+                )
+              }}
+            </form.AppField>
+          )}
+
           {selectedRol &&
             !requiresFacultad(selectedRol) &&
-            !requiresCarrera(selectedRol) && (
+            !requiresCarrera(selectedRol) &&
+            !requiresBloque && (
               <div className="bg-muted/50 p-control rounded-lg border">
                 <p className="text-muted-foreground text-sm">
                   Este rol no requiere seleccionar facultad o carrera.

@@ -8,6 +8,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { qk } from '@/data/query/keys'
 import { supabaseBrowser } from '@/data/supabase/client'
+import { PLAN_AREA_COMUN_ID } from '@/data/types/areaComun'
 
 async function ensureSession(
   queryClient: QueryClient,
@@ -63,6 +64,49 @@ export async function requireAnyPermission(
     permissions.length > 0 &&
     !permissions.some((permission) =>
       effectiveAuthz.permissions.has(permission),
+    )
+  ) {
+    throw redirect({ to: '/' })
+  }
+
+  return session
+}
+
+export function canAccessPlanRoute(
+  planId: string,
+  permissions: ReadonlySet<string>,
+  required: Array<AppPermission>,
+  isAdmin: boolean,
+) {
+  return (
+    isAdmin ||
+    required.some((permission) => permissions.has(permission)) ||
+    (planId === PLAN_AREA_COMUN_ID &&
+      (permissions.has('area_comun.gestionar') ||
+        permissions.has('area_comun.bloque.editar')))
+  )
+}
+
+/**
+ * La gestión del catálogo común concede acceso al plan institucional aunque
+ * los permisos generales de lectura no estén presentes en una sesión simulada.
+ * El permiso especial solo aplica al identificador del plan del área.
+ */
+export async function requirePlanPermission(
+  queryClient: QueryClient,
+  planId: string,
+  permissions: Array<AppPermission>,
+) {
+  const session = await ensureSession(queryClient)
+  if (!session) throw redirect({ to: '/' })
+
+  const effectiveAuthz = await ensureEffectiveAuthz(queryClient, session)
+  if (
+    !canAccessPlanRoute(
+      planId,
+      effectiveAuthz.permissions,
+      permissions,
+      effectiveAuthz.isAdmin,
     )
   ) {
     throw redirect({ to: '/' })

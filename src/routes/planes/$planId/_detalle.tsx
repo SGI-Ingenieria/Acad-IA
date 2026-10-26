@@ -66,7 +66,8 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
-import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { requirePlanPermission } from '@/data/auth/routeGuards'
+import { useAreaComunRealtime } from '@/data/hooks/useAreaComun'
 import { useSession } from '@/data/hooks/useAuth'
 import { useLinajePlan } from '@/data/hooks/useImportacionesAcademicas'
 import { usePermissions } from '@/data/hooks/usePermissions'
@@ -168,8 +169,8 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
   search: {
     middlewares: [stripSearchParams(defaultPlanDetalleSearch)],
   },
-  beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, ['planes.ver']),
+  beforeLoad: ({ context, params }) =>
+    requirePlanPermission(context.queryClient, params.planId, ['planes.ver']),
   // Solo precalentamos la caché sin bloquear: el shell del detalle (barra de
   // volver, cabecera, tarjetas y tabs) se pinta de inmediato y cada zona
   // muestra su placeholder mientras los datos llegan. El "no encontrado" se
@@ -185,6 +186,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
+  useAreaComunRealtime(planId)
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const discardPlan = useDiscardPlanEstudio()

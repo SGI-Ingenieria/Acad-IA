@@ -48,6 +48,8 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import { useAreaComun } from '@/data/hooks/useAreaComun'
+import { AreaComunControl } from '@/features/planes/area-comun/AreaComunControl'
 import { BarraVistaCurricular } from '@/features/planes/curriculo/BarraVistaCurricular'
 import { descripcionBloque } from '@/lib/bloques-conocimiento'
 import {
@@ -96,6 +98,8 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
   } = usePlanAsignaturas(planId)
   const capabilities = usePlanCapabilities(plan)
   const canEdit = capabilities.canEditPlan
+  const { data: areaComun } = useAreaComun(planId)
+  const lineaComunId = areaComun?.incorporacion?.linea_id
   const facultadId = plan?.carreras?.facultad_id ?? null
   const { data: sugerencias = [] } = useLineasSugeridas(facultadId)
   const crear = useCreateLinea()
@@ -308,6 +312,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
       <h2 className="sr-only">Bloques de conocimiento</h2>
 
       <BarraVistaCurricular>
+        {plan && <AreaComunControl plan={plan} editable={canEdit} />}
         {canEdit && (
           <Button data-guia="agregar-bloque" onClick={abrirNuevo}>
             <Plus />
@@ -439,7 +444,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                     </span>
                   </p>
 
-                  {canEdit && (
+                  {canEdit && bloque.id !== lineaComunId && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -457,7 +462,11 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          disabled={index === 0 || reordenar.isPending}
+                          disabled={
+                            Boolean(lineaComunId) ||
+                            index === 0 ||
+                            reordenar.isPending
+                          }
                           onSelect={() => void mover(bloque, -1)}
                         >
                           <ArrowUp />
@@ -465,6 +474,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={
+                            Boolean(lineaComunId) ||
                             index === bloquesOrdenados.length - 1 ||
                             reordenar.isPending
                           }
@@ -487,7 +497,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                 </div>
 
                 <div className="pointer-events-none absolute top-1/2 right-7 hidden h-9 w-56 -translate-y-1/2 sm:block">
-                  {canEdit && (
+                  {canEdit && bloque.id !== lineaComunId && (
                     <div className="gap-micro absolute top-1/2 right-0 flex w-36 translate-x-3 -translate-y-1/2 items-center justify-end opacity-0 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-none">
                       <AccionIcono
                         label={`Editar ${bloque.nombre}`}
@@ -497,7 +507,11 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                       </AccionIcono>
                       <AccionIcono
                         label={`Subir ${bloque.nombre}`}
-                        disabled={index === 0 || reordenar.isPending}
+                        disabled={
+                          Boolean(lineaComunId) ||
+                          index === 0 ||
+                          reordenar.isPending
+                        }
                         onClick={() => void mover(bloque, -1)}
                       >
                         <ArrowUp />
@@ -505,6 +519,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                       <AccionIcono
                         label={`Bajar ${bloque.nombre}`}
                         disabled={
+                          Boolean(lineaComunId) ||
                           index === bloquesOrdenados.length - 1 ||
                           reordenar.isPending
                         }

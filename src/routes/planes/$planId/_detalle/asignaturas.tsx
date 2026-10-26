@@ -84,6 +84,7 @@ import {
 } from '@/data/query/queryOptions'
 import { TiraPostIts, useAgente } from '@/features/agente'
 import { ReintentarGeneracionAsignaturaButton } from '@/features/asignaturas/ReintentarGeneracionAsignaturaButton'
+import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { colorLineaCurricular } from '@/lib/linea-curricular-colors'
 import { cn } from '@/lib/utils'
@@ -261,7 +262,7 @@ function AsignaturasPage() {
   }
 
   const handleArchiveConfirm = async () => {
-    if (!archivingSubject) return
+    if (!archivingSubject || archivingSubject.areaComunOrigenId) return
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
       ? await requestAdminOverrideReason(
           'archivar una asignatura fuera de la etapa normal del plan',
@@ -586,26 +587,49 @@ function AsignaturasPage() {
                     <TableCell className="px-seccion py-grupo">
                       {(() => {
                         const lineaItem = getLinea(asignatura.lineaCurricularId)
-                        const nombre = lineaItem?.nombre ?? 'Sin asignar'
                         const color = lineaItem?.color
-                        if (!color) {
-                          return (
-                            <span className="text-muted-foreground text-sm font-medium">
-                              {nombre}
-                            </span>
-                          )
-                        }
+                        const bloque =
+                          plan?.categoria === 'AREA_COMUN'
+                            ? nombreBloqueAreaComun(asignatura.bloqueAreaComun)
+                            : null
                         return (
-                          <span
-                            className="px-control py-micro inline-flex items-center rounded-full text-sm font-medium"
-                            style={{
-                              backgroundColor: `${color}22`,
-                              color,
-                              border: `1px solid ${color}55`,
-                            }}
-                          >
-                            {nombre}
-                          </span>
+                          <div className="gap-micro flex flex-col items-start">
+                            {plan?.categoria === 'AREA_COMUN' ? (
+                              <span
+                                className="text-muted-foreground border-border pl-relacionado border-l-2 text-sm font-medium"
+                                style={{
+                                  borderLeftColor: color ?? 'var(--primary)',
+                                }}
+                              >
+                                {bloque ?? 'Bloque sin asignar'}
+                              </span>
+                            ) : color ? (
+                              <span
+                                className="px-control py-micro inline-flex items-center rounded-full text-sm font-medium"
+                                style={{
+                                  backgroundColor: `${color}22`,
+                                  color,
+                                  border: `1px solid ${color}55`,
+                                }}
+                              >
+                                {lineaItem.nombre}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-sm font-medium">
+                                {lineaItem?.nombre ?? 'Sin asignar'}
+                              </span>
+                            )}
+                            {plan?.categoria !== 'AREA_COMUN' && bloque && (
+                              <span
+                                className="text-muted-foreground border-border pl-relacionado border-l-2 text-xs font-medium"
+                                style={{
+                                  borderLeftColor: color ?? 'var(--primary)',
+                                }}
+                              >
+                                {bloque}
+                              </span>
+                            )}
+                          </div>
                         )
                       })()}
                     </TableCell>
@@ -636,7 +660,8 @@ function AsignaturasPage() {
                               'lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100',
                           )}
                         >
-                          {asignatura.estado !== 'archivada' ? (
+                          {asignatura.estado !== 'archivada' &&
+                          !asignatura.areaComunOrigenId ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button

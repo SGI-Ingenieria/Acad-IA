@@ -1,14 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { RoutePendingDialog } from '@/components/ui/route-pending-skeleton'
-import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { requirePlanPermission } from '@/data/auth/routeGuards'
 import { NuevaAsignaturaModalContainer } from '@/features/asignaturas/nueva/NuevaAsignaturaModalContainer'
 
 export const Route = createFileRoute(
   '/planes/$planId/_detalle/asignaturas/nueva',
 )({
-  beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, ['asignaturas.editar']),
+  beforeLoad: ({ context, params }) =>
+    requirePlanPermission(context.queryClient, params.planId, [
+      'asignaturas.editar',
+    ]),
   pendingComponent: NuevaAsignaturaPending,
   component: NuevaAsignaturaModal,
 })

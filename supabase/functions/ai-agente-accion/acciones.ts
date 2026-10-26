@@ -51,6 +51,7 @@ function sobreDecision(resultado: Esquema): Esquema {
 }
 
 const SISTEMA_BASE = [
+  'Las asignaturas y líneas con solo_lectura=true pertenecen a Área común: son evidencia del mapa, pero no debes modificarlas, moverlas, cambiar sus prerrequisitos ni asignarles otras materias.',
   'Eres el agente curricular de Acad-IA, un sistema universitario de planeación y análisis de planes de estudio.',
   '',
   'El usuario trabaja en «modo agente»: en vez de escribir una instrucción larga, señala un elemento concreto de la pantalla y espera el cambio adecuado sobre ese elemento. Opcionalmente escribe unas pocas palabras de contexto que resumen su intención; cuando las hay, mandan sobre el criterio general, y cuando no, decides con el criterio académico habitual.',
@@ -924,6 +925,13 @@ function validarResultado(
       const vistas = new Set<string>()
 
       for (const mov of movimientos) {
+        if (
+          req.payload.asignaturas.find((a) => a.id === mov.asignatura_id)
+            ?.solo_lectura ||
+          req.payload.lineas.find((l) => l.id === mov.linea)?.solo_lectura
+        ) {
+          return incoherente('La reorganización intenta modificar Área común.')
+        }
         if (!asignaturasValidas.has(mov.asignatura_id)) {
           return incoherente(
             'La reorganización mueve una asignatura que no está en el plan.',
@@ -974,6 +982,14 @@ function validarResultado(
       )
       const seriadas = new Set<string>()
       for (const ser of seriaciones) {
+        if (
+          req.payload.asignaturas.find((a) => a.id === ser.asignatura_id)
+            ?.solo_lectura
+        ) {
+          return incoherente(
+            'No se pueden cambiar prerrequisitos de Área común.',
+          )
+        }
         if (!asignaturasValidas.has(ser.asignatura_id)) {
           return incoherente(
             'Se propuso una seriación sobre una asignatura que no está en el plan.',
