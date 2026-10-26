@@ -202,7 +202,7 @@ function IncorporacionEditor({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>2. Área curricular común</DialogTitle>
+        <DialogTitle>Área curricular común</DialogTitle>
       </DialogHeader>
       {!contexto.publicacion_id ? (
         <p role="status">Área común aún no tiene una publicación.</p>
@@ -685,7 +685,7 @@ export function AreaComunAcceso() {
   return (
     <Button variant="outline" asChild>
       <Link to="/planes/$planId/mapa" params={{ planId: PLAN_AREA_COMUN_ID }}>
-        Administrar 2. Área curricular común
+        Administrar Área curricular común
       </Link>
     </Button>
   )
@@ -919,7 +919,7 @@ export function AreaComunInicio({
                 to="/planes/$planId/mapa"
                 params={{ planId: PLAN_AREA_COMUN_ID }}
               >
-                Administrar 2. Área curricular común
+                Administrar Área curricular común
               </Link>
             </Button>
           )}

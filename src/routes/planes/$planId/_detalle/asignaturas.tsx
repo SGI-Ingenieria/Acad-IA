@@ -587,7 +587,6 @@ function AsignaturasPage() {
                     <TableCell className="px-seccion py-grupo">
                       {(() => {
                         const lineaItem = getLinea(asignatura.lineaCurricularId)
-                        const nombre = lineaItem?.nombre ?? 'Sin asignar'
                         const color = lineaItem?.color
                         const bloque =
                           plan?.categoria === 'AREA_COMUN'
@@ -595,7 +594,16 @@ function AsignaturasPage() {
                             : null
                         return (
                           <div className="gap-micro flex flex-col items-start">
-                            {color ? (
+                            {plan?.categoria === 'AREA_COMUN' ? (
+                              <span
+                                className="text-muted-foreground border-border pl-relacionado border-l-2 text-sm font-medium"
+                                style={{
+                                  borderLeftColor: color ?? 'var(--primary)',
+                                }}
+                              >
+                                {bloque ?? 'Bloque sin asignar'}
+                              </span>
+                            ) : color ? (
                               <span
                                 className="px-control py-micro inline-flex items-center rounded-full text-sm font-medium"
                                 style={{
@@ -604,14 +612,14 @@ function AsignaturasPage() {
                                   border: `1px solid ${color}55`,
                                 }}
                               >
-                                {nombre}
+                                {lineaItem.nombre}
                               </span>
                             ) : (
                               <span className="text-muted-foreground text-sm font-medium">
-                                {nombre}
+                                {lineaItem?.nombre ?? 'Sin asignar'}
                               </span>
                             )}
-                            {bloque && (
+                            {plan?.categoria !== 'AREA_COMUN' && bloque && (
                               <span
                                 className="text-muted-foreground border-border pl-relacionado border-l-2 text-xs font-medium"
                                 style={{

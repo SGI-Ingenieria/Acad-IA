@@ -1,12 +1,10 @@
 import {
   createFileRoute,
-  Link,
   useNavigate,
   useRouterState,
 } from '@tanstack/react-router'
 import {
   AlertTriangle,
-  ArrowRight,
   Calculator,
   Download,
   GitBranch,
@@ -2164,13 +2162,13 @@ function MapaCurricularPage() {
                               key={espacio.clave}
                               type="button"
                               onClick={() => setElectivaActiva(espacio)}
-                              className="border-primary/35 bg-card hover:border-primary organic-interactive p-control w-full rounded-xl border text-left"
+                              className="border-primary/35 bg-card hover:border-primary organic-interactive p-grupo flex h-44 min-h-44 w-40 min-w-40 shrink-0 flex-col items-center justify-between rounded-xl border text-center"
                               aria-label={`Abrir ${espacio.nombre ?? `Electiva ${index + 1}`} en ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
                             >
                               <span className="text-muted-foreground block text-xs">
                                 {formatCiclo(data?.tipo_ciclo, cicloNumero)}
                               </span>
-                              <span className="text-foreground block font-semibold">
+                              <span className="text-foreground line-clamp-3 flex flex-1 items-center justify-center font-semibold">
                                 {espacio.nombre ?? `Electiva ${index + 1}`}
                               </span>
                               <span className="text-muted-foreground text-xs">
@@ -2369,54 +2367,53 @@ function MapaCurricularPage() {
                 {electivaActiva.opciones?.length ?? 0} opciones disponibles
               </DialogDescription>
             </DialogHeader>
-            <ul className="divide-border divide-y">
+            <div className="gap-grupo flex flex-wrap">
               {(electivaActiva.opciones ?? []).map((id) => {
                 const original = fuenteElectiva(id)
-                const local = asignaturas.find(
-                  (asignatura) => asignatura.areaComunOrigenId === id,
+                const materia = asignaturas.find(
+                  (asignatura) =>
+                    asignatura.id === id || asignatura.areaComunOrigenId === id,
                 )
-                const localId = local?.id ?? (esPlanAreaComun ? id : null)
                 const nombre =
-                  original?.nombre ?? local?.nombre ?? 'Asignatura electiva'
+                  materia?.nombre ?? original?.nombre ?? 'Asignatura electiva'
                 const codigo =
-                  original && 'codigo' in original
+                  materia?.clave ??
+                  (original && 'codigo' in original
                     ? original.codigo
-                    : local?.clave
+                    : undefined)
                 const seleccionada =
                   areaComun?.incorporacion?.electivas[electivaActiva.clave] ===
                   id
+                const carga = horasElectiva(id)
                 return (
-                  <li
+                  <button
                     key={id}
-                    className="gap-grupo py-control flex items-center justify-between"
+                    type="button"
+                    disabled={!materia}
+                    aria-label={`Abrir ${nombre}${codigo ? `, ${codigo}` : ''}${seleccionada ? ', elegida en este plan' : ''}`}
+                    onClick={() => {
+                      if (!materia) return
+                      setElectivaActiva(null)
+                      setEditingData(materia)
+                      setIsEditModalOpen(true)
+                    }}
+                    className="organic-interactive bg-card border-border hover:border-primary focus-visible:ring-ring/30 p-grupo flex h-44 min-h-44 w-40 min-w-40 shrink-0 flex-col items-center justify-between overflow-hidden rounded-xl border text-center focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <span className="min-w-0">
-                      <span className="block font-medium">{nombre}</span>
-                      <span className="text-muted-foreground text-sm">
-                        {[
-                          codigo,
-                          `${horasElectiva(id).hd + horasElectiva(id).hi} h`,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                        {seleccionada ? ' · Elegida en este plan' : ''}
-                      </span>
+                    <span className="text-muted-foreground flex w-full items-center justify-between text-xs">
+                      <span className="truncate">{codigo ?? 'Sin clave'}</span>
+                      {seleccionada && <span aria-hidden="true">✓</span>}
                     </span>
-                    {localId &&
-                      (esPlanAreaComun ? canEditMapa : Boolean(local)) && (
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link
-                            to="/planes/$planId/asignaturas/$asignaturaId"
-                            params={{ planId, asignaturaId: localId }}
-                          >
-                            {esPlanAreaComun ? 'Editar' : 'Ver'} <ArrowRight />
-                          </Link>
-                        </Button>
-                      )}
-                  </li>
+                    <span className="text-foreground line-clamp-3 flex flex-1 items-center justify-center text-sm leading-tight font-semibold">
+                      {nombre}
+                    </span>
+                    <span className="text-muted-foreground flex w-full items-end justify-between text-xs">
+                      <span>{carga.creditos} CR</span>
+                      <span>{carga.hd + carga.hi} h</span>
+                    </span>
+                  </button>
                 )
               })}
-            </ul>
+            </div>
           </DialogContent>
         )}
       </Dialog>
