@@ -52,3 +52,13 @@ export * from './hooks/useRecursos'
 export * from './hooks/usePaquetes'
 export * from './hooks/useDocumentos'
 export * from './hooks/useImportacionesAcademicas'
+
+export {
+  gruposElectivosListar,
+  gruposElectivosGestionar,
+} from './api/gruposElectivos.api'
+export type {
+  GrupoElectivoPlan,
+  OperacionGrupoElectivo,
+} from './api/gruposElectivos.api'
+export * from './hooks/useGruposElectivos'

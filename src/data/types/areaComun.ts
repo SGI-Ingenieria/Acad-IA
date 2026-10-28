@@ -10,6 +10,7 @@ export const espacioAreaComunSchema = z
     nombre: z.string().optional(),
     asignatura_id: z.uuid().optional(),
     opciones: z.array(z.uuid()).min(1).optional(),
+    prerrequisito_grupo_clave: z.string().trim().min(1).optional(),
   })
   .refine((e) => Boolean(e.asignatura_id) !== Boolean(e.opciones), {
     message: 'Elige una materia fija o un catálogo de electivas.',
@@ -26,6 +27,28 @@ export const distribucionAreaComunSchema = z
   })
   .refine((d) => d.espacios.every((e) => e.numero_ciclo <= d.numero_ciclos), {
     message: 'Hay materias fuera de la duración de la distribución.',
+  })
+  .superRefine((d, ctx) => {
+    for (const [index, grupo] of d.espacios.entries()) {
+      if (!grupo.prerrequisito_grupo_clave) continue
+      const previo = d.espacios.find(
+        (e) => e.clave === grupo.prerrequisito_grupo_clave,
+      )
+      // Un ciclo estrictamente anterior hace imposible una dependencia circular.
+      if (
+        !grupo.opciones ||
+        !previo?.opciones ||
+        previo.clave === grupo.clave ||
+        previo.numero_ciclo >= grupo.numero_ciclo
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['espacios', index, 'prerrequisito_grupo_clave'],
+          message:
+            'La seriación debe enlazar grupos electivos de la misma distribución y de un ciclo anterior.',
+        })
+      }
+    }
   })
 
 export const configuracionAreaComunSchema = z

@@ -1,3 +1,4 @@
+import { filasCurricularesConElectivas } from '../_shared/grupos-electivos-documento.ts'
 import type { SupabaseClient as SupabaseJsClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -69,7 +70,7 @@ async function prepararDatosParaExcel(
     .eq('id', planEstudioId)
     .single()
 
-  const { data: asignaturas, error: asigError } = await supabase
+  const { data: asignaturasBase, error: asigError } = await supabase
     .from('asignaturas')
     .select('*, linea:lineas_plan(nombre)')
     .eq('plan_estudio_id', planEstudioId)
@@ -77,6 +78,29 @@ async function prepararDatosParaExcel(
 
   if (planError || asigError)
     throw new Error('Error obteniendo datos de la base de datos.')
+
+  const [
+    { data: grupos, error: gruposError },
+    { data: lineasPropias, error: lineasError },
+  ] = await Promise.all([
+    supabase
+      .from('grupos_electivos_plan')
+      .select('*')
+      .eq('plan_estudio_id', planEstudioId)
+      .order('numero_ciclo')
+      .order('id'),
+    supabase
+      .from('lineas_plan')
+      .select('id,nombre')
+      .eq('plan_estudio_id', planEstudioId),
+  ])
+  if (gruposError || lineasError)
+    throw new Error('No se pudo cargar la composición electiva del plan.')
+  const asignaturas = filasCurricularesConElectivas(
+    asignaturasBase,
+    grupos ?? [],
+    lineasPropias ?? [],
+  )
 
   // --- MAPA DE BÚSQUEDA PARA PRERREQUISITOS ---
   const mapaClaves = asignaturas.reduce(
@@ -1641,7 +1665,7 @@ export async function prepararDatosParaPlan(
   planEstudioId: string,
 ): Promise<unknown> {
   const ctx = await loadPlanContext(supabase, planEstudioId)
-  return postProcessDatosPlan(
+  const datosPlan = postProcessDatosPlan(
     construirDatos(
       CAMPOS_SIEMPRE_PLAN,
       { plan: ctx.plan, carrera: ctx.carrera },
@@ -1652,6 +1676,35 @@ export async function prepararDatosParaPlan(
     ctx.datos,
     ctx.fecha_inicio_imparticion,
   )
+  const { data: grupos, error: errorGrupos } = await supabase
+    .from('grupos_electivos_plan')
+    .select('*')
+    .eq('plan_estudio_id', planEstudioId)
+    .order('numero_ciclo')
+    .order('id')
+  if (errorGrupos)
+    throw new Error(
+      'No se pudieron cargar los bloques electivos del documento.',
+    )
+  if (!grupos?.length) return datosPlan
+  const { data: alternativas, error: errorAlternativas } = await supabase
+    .from('asignaturas')
+    .select(
+      'id,codigo,nombre,grupo_electivo_id,creditos,horas_academicas,horas_independientes',
+    )
+    .eq('plan_estudio_id', planEstudioId)
+    .not('grupo_electivo_id', 'is', null)
+  if (errorAlternativas)
+    throw new Error('No se pudieron cargar las alternativas del documento.')
+  return {
+    ...datosPlan,
+    grupos_electivos: grupos.map((g) => ({
+      ...g,
+      alternativas: (alternativas ?? []).filter(
+        (a) => a.grupo_electivo_id === g.id,
+      ),
+    })),
+  }
 }
 
 async function loadTemplateIdForEstructura(

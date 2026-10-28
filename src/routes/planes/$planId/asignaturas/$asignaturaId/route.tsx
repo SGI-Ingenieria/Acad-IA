@@ -33,6 +33,7 @@ import type {
   PayloadProponerPrerrequisito,
   ResultadoProponerPrerrequisito,
 } from '@/data'
+import type { EspacioAreaComun } from '@/data/types/areaComun'
 import type { Tables } from '@/types/supabase'
 
 import { IAAsignaturaTab } from '@/components/asignaturas/detalle/IAAsignaturaTab'
@@ -95,8 +96,9 @@ import {
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { requirePlanPermission } from '@/data/auth/routeGuards'
-import { useAreaComunRealtime } from '@/data/hooks/useAreaComun'
+import { useAreaComun, useAreaComunRealtime } from '@/data/hooks/useAreaComun'
 import { useSession } from '@/data/hooks/useAuth'
+import { useGruposElectivos } from '@/data/hooks/useGruposElectivos'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
 import { useComentariosPlan } from '@/data/hooks/useWorkflow'
@@ -116,6 +118,10 @@ import {
 } from '@/features/comentarios/hooks/useCommentsRead'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
 import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
+import {
+  esAlternativaElectiva,
+  espaciosSeriacionAreaComun,
+} from '@/lib/area-comun-seriacion'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
@@ -300,10 +306,18 @@ function InlineEditBadge({
 
 type AsignaturaSeriacion = Pick<
   Tables<'asignaturas'>,
-  'id' | 'codigo' | 'nombre' | 'numero_ciclo' | 'linea_plan_id'
+  | 'id'
+  | 'codigo'
+  | 'nombre'
+  | 'numero_ciclo'
+  | 'linea_plan_id'
+  | 'area_comun_origen_id'
+  | 'grupo_electivo_id'
 >
 
 function SeriacionControl({
+  espaciosElectivos,
+  contextoDisponible,
   asignatura,
   asignaturas,
   canEdit,
@@ -316,6 +330,8 @@ function SeriacionControl({
   asignatura: AsignaturaSeriacion & {
     prerrequisito_asignatura_id?: string | null
   }
+  contextoDisponible: boolean
+  espaciosElectivos: Array<EspacioAreaComun>
   asignaturas: Array<AsignaturaSeriacion>
   canEdit: boolean
   canUseIA: boolean
@@ -333,7 +349,20 @@ function SeriacionControl({
       asignaturas
         .filter(
           (item) =>
+            contextoDisponible &&
+            !asignatura.grupo_electivo_id &&
+            !item.grupo_electivo_id &&
             item.id !== asignatura.id &&
+            !esAlternativaElectiva(
+              espaciosElectivos,
+              asignatura.id,
+              asignatura.area_comun_origen_id,
+            ) &&
+            !esAlternativaElectiva(
+              espaciosElectivos,
+              item.id,
+              item.area_comun_origen_id,
+            ) &&
             item.numero_ciclo !== null &&
             asignatura.numero_ciclo !== null &&
             item.numero_ciclo < asignatura.numero_ciclo,
@@ -343,7 +372,7 @@ function SeriacionControl({
             (right.numero_ciclo ?? 0) - (left.numero_ciclo ?? 0) ||
             left.nombre.localeCompare(right.nombre, 'es'),
         ),
-    [asignatura.id, asignatura.numero_ciclo, asignaturas],
+    [asignatura, espaciosElectivos, asignaturas, contextoDisponible],
   )
   const mismaLinea = asignatura.linea_plan_id
     ? elegibles.filter(
@@ -438,6 +467,17 @@ function SeriacionControl({
 
   return (
     <div className="gap-micro flex min-w-0 flex-col">
+      {seriada &&
+        esAlternativaElectiva(
+          espaciosElectivos,
+          asignatura.id,
+          asignatura.area_comun_origen_id,
+        ) && (
+          <p role="alert" className="text-destructive text-sm">
+            Quita la seriación individual incompatible; esta alternativa se
+            seria desde su grupo.
+          </p>
+        )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -539,6 +579,8 @@ function AsignaturaLayout() {
   })
   const { origen, soloAsignatura } = Route.useSearch()
   useAreaComunRealtime(planId)
+  const { data: contextoComun } = useAreaComun(planId)
+  const { data: gruposPropios = [] } = useGruposElectivos(planId)
   const { data: plan } = usePlan(planId)
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditAsignatura = capabilities.canEditAsignaturas
@@ -984,7 +1026,35 @@ function AsignaturaLayout() {
             {/* Contexto académico: en móvil cada relación conserva su propia
                 línea para evitar que seriación y plan compitan por el ancho. */}
             <div className="text-muted-foreground mt-relacionado gap-control md:gap-seccion grid min-w-0 text-sm md:grid-cols-[minmax(0,auto)_minmax(0,1fr)] md:items-center">
+              {(() => {
+                const espacios = espaciosSeriacionAreaComun(contextoComun)
+                const grupo = espacios.find((e) =>
+                  e.opciones?.includes(
+                    asignaturaApi.area_comun_origen_id ?? asignaturaApi.id,
+                  ),
+                )
+                if (!grupo) return null
+                const previo = espacios.find(
+                  (e) => e.clave === grupo.prerrequisito_grupo_clave,
+                )
+                return (
+                  <p className="text-sm">
+                    {grupo.nombre ?? grupo.clave} · Antecedente:{' '}
+                    {previo?.nombre ?? previo?.clave ?? 'Sin seriación'}
+                  </p>
+                )
+              })()}
+              {asignaturaApi.grupo_electivo_id && (
+                <p className="text-sm">
+                  Alternativa de{' '}
+                  {gruposPropios.find(
+                    (g) => g.id === asignaturaApi.grupo_electivo_id,
+                  )?.nombre ?? 'bloque electivo'}
+                </p>
+              )}
               <SeriacionControl
+                espaciosElectivos={espaciosSeriacionAreaComun(contextoComun)}
+                contextoDisponible={Boolean(contextoComun)}
                 asignatura={asignaturaApi}
                 asignaturas={todasLasAsignaturas ?? []}
                 canEdit={canEditAsignatura}

@@ -24,6 +24,21 @@ export type Database = {
         }
         Relationships: []
       }
+      grupos_electivos_operaciones: {
+        Row: {
+          proceso: number
+          transaccion: number
+        }
+        Insert: {
+          proceso: number
+          transaccion: number
+        }
+        Update: {
+          proceso?: number
+          transaccion?: number
+        }
+        Relationships: []
+      }
       intentos_generacion_ia: {
         Row: {
           actualizado_en: string
@@ -401,6 +416,7 @@ export type Database = {
         }
         Returns: Json
       }
+      grupos_electivos_operacion: { Args: never; Returns: boolean }
       hay_recuperacion_ia_pendiente: { Args: never; Returns: boolean }
       intento_chat_ia_json: { Args: { p_intento_id: string }; Returns: Json }
       intento_generacion_ia_json: {
@@ -1117,6 +1133,7 @@ export type Database = {
           datos: Json
           estado: Database['public']['Enums']['estado_asignatura']
           estructura_id: string
+          grupo_electivo_id: string | null
           horas_academicas: number | null
           horas_independientes: number | null
           id: string
@@ -1148,6 +1165,7 @@ export type Database = {
           datos?: Json
           estado?: Database['public']['Enums']['estado_asignatura']
           estructura_id: string
+          grupo_electivo_id?: string | null
           horas_academicas?: number | null
           horas_independientes?: number | null
           id?: string
@@ -1179,6 +1197,7 @@ export type Database = {
           datos?: Json
           estado?: Database['public']['Enums']['estado_asignatura']
           estructura_id?: string
+          grupo_electivo_id?: string | null
           horas_academicas?: number | null
           horas_independientes?: number | null
           id?: string
@@ -1243,6 +1262,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'plantilla_asignatura'
             referencedColumns: ['estructura_id']
+          },
+          {
+            foreignKeyName: 'asignaturas_grupo_electivo_id_fkey'
+            columns: ['grupo_electivo_id']
+            isOneToOne: false
+            referencedRelation: 'grupos_electivos_plan'
+            referencedColumns: ['id']
           },
           {
             foreignKeyName: 'asignaturas_linea_plan_fk_compuesta'
@@ -3260,6 +3286,81 @@ export type Database = {
           },
         ]
       }
+      grupos_electivos_plan: {
+        Row: {
+          actualizado_en: string
+          creado_por: string | null
+          id: string
+          linea_plan_id: string
+          nombre: string
+          numero_ciclo: number
+          orden: number
+          plan_estudio_id: string
+          prerrequisito_grupo_id: string | null
+          revision: number
+        }
+        Insert: {
+          actualizado_en?: string
+          creado_por?: string | null
+          id?: string
+          linea_plan_id: string
+          nombre: string
+          numero_ciclo: number
+          orden?: number
+          plan_estudio_id: string
+          prerrequisito_grupo_id?: string | null
+          revision?: number
+        }
+        Update: {
+          actualizado_en?: string
+          creado_por?: string | null
+          id?: string
+          linea_plan_id?: string
+          nombre?: string
+          numero_ciclo?: number
+          orden?: number
+          plan_estudio_id?: string
+          prerrequisito_grupo_id?: string | null
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'grupos_electivos_plan_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'grupos_electivos_plan_linea_plan_id_fkey'
+            columns: ['linea_plan_id']
+            isOneToOne: false
+            referencedRelation: 'lineas_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'grupos_electivos_plan_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'grupos_electivos_plan_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+          {
+            foreignKeyName: 'grupos_electivos_plan_prerrequisito_grupo_id_fkey'
+            columns: ['prerrequisito_grupo_id']
+            isOneToOne: false
+            referencedRelation: 'grupos_electivos_plan'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       guias_usuario: {
         Row: {
           actualizado_en: string
@@ -3699,7 +3800,9 @@ export type Database = {
           id: string
           intento_generacion_activo_id: string | null
           openai_response_id: string | null
-          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
+          requested_types: Array<
+            Database['public']['Enums']['learning_object_tipo']
+          >
           resultado_json: Json
           scope: Database['public']['Enums']['learning_generation_scope']
           tema_id: string | null
@@ -3717,7 +3820,9 @@ export type Database = {
           id?: string
           intento_generacion_activo_id?: string | null
           openai_response_id?: string | null
-          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
+          requested_types: Array<
+            Database['public']['Enums']['learning_object_tipo']
+          >
           resultado_json?: Json
           scope?: Database['public']['Enums']['learning_generation_scope']
           tema_id?: string | null
@@ -3735,7 +3840,9 @@ export type Database = {
           id?: string
           intento_generacion_activo_id?: string | null
           openai_response_id?: string | null
-          requested_types?: Array<Database['public']['Enums']['learning_object_tipo']>
+          requested_types?: Array<
+            Database['public']['Enums']['learning_object_tipo']
+          >
           resultado_json?: Json
           scope?: Database['public']['Enums']['learning_generation_scope']
           tema_id?: string | null
@@ -5868,6 +5975,7 @@ export type Database = {
           datos: Json
           estado: Database['public']['Enums']['estado_asignatura']
           estructura_id: string
+          grupo_electivo_id: string | null
           horas_academicas: number | null
           horas_independientes: number | null
           id: string
@@ -6255,6 +6363,15 @@ export type Database = {
         Args: { p_carrera_id: string; p_fecha_inicio_imparticion: string }
         Returns: string
       }
+      gestionar_grupo_electivo_plan: {
+        Args: {
+          p_datos?: Json
+          p_grupo_id: string
+          p_operacion: string
+          p_plan_id: string
+        }
+        Returns: string
+      }
       guardar_progreso_guia: {
         Args: {
           p_completada: boolean
@@ -6467,7 +6584,9 @@ export type Database = {
           id: string
           intento_generacion_activo_id: string | null
           openai_response_id: string | null
-          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
+          requested_types: Array<
+            Database['public']['Enums']['learning_object_tipo']
+          >
           resultado_json: Json
           scope: Database['public']['Enums']['learning_generation_scope']
           tema_id: string | null
