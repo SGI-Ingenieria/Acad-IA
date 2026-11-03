@@ -28,6 +28,7 @@ export interface Carrera {
 export type LineaCurricular = Tables<'lineas_plan'>
 
 export interface Asignatura {
+  grupoElectivoId?: string | null
   areaComunOrigenId?: string | null
   bloqueAreaComun?: string | null
   id: string

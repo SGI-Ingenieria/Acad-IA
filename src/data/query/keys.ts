@@ -1,4 +1,6 @@
 export const qk = {
+  gruposElectivos: (planId: string) =>
+    ['planes', planId, 'gruposElectivos'] as const,
   areaComunRoot: () => ['areaComun'] as const,
   areaComun: (planId: string) => [...qk.areaComunRoot(), planId] as const,
   areaComunDashboard: (planId: string, asignaturaIds: Array<string>) =>
@@ -209,6 +211,8 @@ export const qk = {
  * `optimisticMutation`. Crece una entrada por mutación migrada.
  */
 export const mk = {
+  gruposElectivos: (planId: string) =>
+    ['asignaturas', 'gruposElectivos', planId] as const,
   planFields: () => ['planes', 'updateFields'] as const,
   planMapa: () => ['planes', 'updateMapa'] as const,
   planDelete: () => ['planes', 'delete'] as const,

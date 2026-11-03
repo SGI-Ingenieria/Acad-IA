@@ -466,6 +466,7 @@ function DistribucionesEditor({
                       <EspacioEditor
                         key={espacio.clave}
                         espacio={espacio}
+                        espacios={d.espacios}
                         materias={materias}
                         max={d.numero_ciclos}
                         actualizar={(patch) =>
@@ -553,6 +554,7 @@ function DistribucionesEditor({
 }
 
 function EspacioEditor({
+  espacios,
   espacio,
   materias,
   max,
@@ -561,6 +563,7 @@ function EspacioEditor({
   retirar,
 }: {
   espacio: EspacioAreaComun
+  espacios: Array<EspacioAreaComun>
   materias: Array<Asignatura>
   max: number
   actualizar: (patch: Partial<EspacioAreaComun>) => void
@@ -634,6 +637,43 @@ function EspacioEditor({
           Retirar espacio
         </Button>
       </div>
+      {espacio.opciones && (
+        <div className="space-y-control">
+          <Label htmlFor={'antecedente-' + espacio.clave}>
+            Grupo antecedente
+          </Label>
+          <Select
+            value={espacio.prerrequisito_grupo_clave ?? 'ninguno'}
+            onValueChange={(clave) => {
+              const { prerrequisito_grupo_clave: _previo, ...base } = espacio
+              reemplazar(
+                clave === 'ninguno'
+                  ? base
+                  : { ...base, prerrequisito_grupo_clave: clave },
+              )
+            }}
+          >
+            <SelectTrigger id={'antecedente-' + espacio.clave}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ninguno">Sin seriación</SelectItem>
+              {espacios
+                .filter(
+                  (e) =>
+                    e.opciones &&
+                    e.clave !== espacio.clave &&
+                    e.numero_ciclo < espacio.numero_ciclo,
+                )
+                .map((e) => (
+                  <SelectItem key={e.clave} value={e.clave}>
+                    {e.nombre ?? e.clave}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {espacio.opciones && (
         <div className="gap-control grid sm:grid-cols-2">
           {materias.map((a) => (

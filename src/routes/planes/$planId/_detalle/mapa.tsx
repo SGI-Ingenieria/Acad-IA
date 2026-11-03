@@ -1,7 +1,7 @@
 import {
-  createFileRoute,
   useNavigate,
   useRouterState,
+  createFileRoute,
 } from '@tanstack/react-router'
 import {
   AlertTriangle,
@@ -44,6 +44,10 @@ import type {
   ResultadoReorganizarMapa,
   TipoAsignatura,
 } from '@/data'
+import type {
+  GrupoElectivoPlan,
+  OperacionGrupoElectivo,
+} from '@/data/api/gruposElectivos.api'
 import type { EspacioAreaComun } from '@/data/types/areaComun'
 import type { OpcionesAccionAgente } from '@/features/agente'
 import type { Asignatura } from '@/types/plan'
@@ -51,7 +55,11 @@ import type { CSSProperties } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import AsignaturaCardItem from '@/components/planes/detalle/mapa/AsignaturaCardItem'
-import { showAppAlert } from '@/components/ui/app-alert-dialog'
+import {
+  showAppAlert,
+  showAppConfirm,
+  showAppPrompt,
+} from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -105,9 +113,16 @@ import {
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useAreaComun } from '@/data/hooks/useAreaComun'
+import {
+  useGruposElectivos,
+  useGestionarGrupoElectivo,
+} from '@/data/hooks/useGruposElectivos'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { AccionAgente, useAccionAgente } from '@/features/agente'
 import { AreaComunControl } from '@/features/planes/area-comun/AreaComunControl'
+import { GrupoSeriacionControl } from '@/features/planes/area-comun/GrupoSeriacionControl'
 import { BarraVistaCurricular } from '@/features/planes/curriculo/BarraVistaCurricular'
+import { GrupoElectivoPropio } from '@/features/planes/electivas/GrupoElectivoPropio'
 import {
   Flip,
   gsap,
@@ -115,14 +130,22 @@ import {
   organicEase,
   prefersReducedMotion,
 } from '@/lib/animations'
+import { nombreBloqueAreaComun } from '@/lib/area-comun-bloques'
+import {
+  aristasSeriacionGrupos,
+  esAlternativaElectiva,
+  espaciosSeriacionAreaComun,
+} from '@/lib/area-comun-seriacion'
 import { descripcionBloque } from '@/lib/bloques-conocimiento'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { HORAS_POR_CREDITO } from '@/lib/creditos-utils'
+import { alternativasSinDuplicarCarga } from '@/lib/grupos-electivos'
 import {
   colorLineaCurricular,
   PALETA_LINEAS_CURRICULARES,
 } from '@/lib/linea-curricular-colors'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { obtenerCadenaSeriacion } from '@/lib/seriacion-mapa'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -180,6 +203,7 @@ const mapAsignaturasToAsignaturas = (
   return asigApi.map((asig) => {
     return {
       id: asig.id,
+      grupoElectivoId: asig.grupo_electivo_id,
       areaComunOrigenId: asig.area_comun_origen_id,
       bloqueAreaComun:
         asig.meta_origen &&
@@ -416,51 +440,6 @@ function getBezierPath(source: CardRect, target: CardRect): string {
   return `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}`
 }
 
-function buildChainIds(
-  hoveredId: string | null,
-  asignaturas: Array<Asignatura>,
-): Set<string> | null {
-  if (!hoveredId) return null
-
-  const childrenByParent = new Map<string, Array<string>>()
-  const parentByChild = new Map<string, string>()
-
-  asignaturas.forEach((asignatura) => {
-    if (asignatura.prerrequisito_asignatura_id) {
-      parentByChild.set(asignatura.id, asignatura.prerrequisito_asignatura_id)
-
-      const children =
-        childrenByParent.get(asignatura.prerrequisito_asignatura_id) ?? []
-      children.push(asignatura.id)
-      childrenByParent.set(asignatura.prerrequisito_asignatura_id, children)
-    }
-  })
-
-  const visited = new Set<string>([hoveredId])
-  const queue = [hoveredId]
-
-  while (queue.length > 0) {
-    const currentId = queue.pop()
-    if (!currentId) continue
-
-    const parentId = parentByChild.get(currentId)
-    if (parentId && !visited.has(parentId)) {
-      visited.add(parentId)
-      queue.push(parentId)
-    }
-
-    const children = childrenByParent.get(currentId) ?? []
-    children.forEach((childId) => {
-      if (!visited.has(childId)) {
-        visited.add(childId)
-        queue.push(childId)
-      }
-    })
-  }
-
-  return visited
-}
-
 export const Route = createFileRoute('/planes/$planId/_detalle/mapa')({
   component: MapaCurricularPage,
 })
@@ -472,9 +451,16 @@ function MapaCurricularPage() {
     select: (state) => state.location.state.scrollToMapaPendientes,
   })
   const { data } = usePlan(planId)
+  const { roleKeys } = usePermissions()
   const capabilities = usePlanCapabilities(data)
   const canEditMapa = capabilities.canEditAsignaturas
   const { data: areaComun } = useAreaComun(planId)
+  const { data: gruposPropios = [], error: errorGrupos } =
+    useGruposElectivos(planId)
+  const gestionGrupo = useGestionarGrupoElectivo(planId)
+  const [grupoArrastradoId, setGrupoArrastradoId] = useState<string | null>(
+    null,
+  )
   const lineaComunId = areaComun?.incorporacion?.linea_id
   const [totalCiclos, setTotalCiclos] = useState(0)
   const { data: asignaturaApi, isLoading: loadingAsig } =
@@ -508,7 +494,7 @@ function MapaCurricularPage() {
     {},
   )
   const mapOverlayRef = useRef<HTMLDivElement>(null)
-  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const cardRefs = useRef<Record<string, HTMLElement | null>>({})
   const contenedorMapaRef = useRef<HTMLDivElement>(null)
   const flipMapaRef = useRef<ReturnType<typeof Flip.getState> | null>(null)
 
@@ -636,19 +622,22 @@ function MapaCurricularPage() {
   const ciclosArray = Array.from({ length: ciclosTotales }, (_, i) => i + 1)
   const esPlanAreaComun = data?.categoria === 'AREA_COMUN'
   const distribucionComun =
-    areaComun?.distribucion ??
-    areaComun?.borrador?.find(
+    (esPlanAreaComun && areaComun?.borrador ? null : areaComun?.distribucion) ??
+    (areaComun?.borrador ?? areaComun?.contenido?.distribuciones)?.find(
       (d) =>
         d.numero_ciclos === data?.numero_ciclos &&
         d.tipo_ciclo === data.tipo_ciclo &&
         !d.carrera_id,
     ) ??
     null
-  const espaciosElectivos =
-    esPlanAreaComun || lineaComunId
-      ? (distribucionComun?.espacios.filter((espacio) => espacio.opciones) ??
-        [])
-      : []
+  const espaciosElectivos = useMemo(
+    () =>
+      esPlanAreaComun || lineaComunId
+        ? (distribucionComun?.espacios.filter((espacio) => espacio.opciones) ??
+          [])
+        : [],
+    [esPlanAreaComun, lineaComunId, distribucionComun],
+  )
   const idsOpcionesElectivas = new Set(
     espaciosElectivos.flatMap((espacio) => espacio.opciones ?? []),
   )
@@ -658,6 +647,10 @@ function MapaCurricularPage() {
     : lineaComunId
   const esOpcionElectiva = (asignatura: Asignatura) =>
     idsOpcionesElectivas.has(asignatura.areaComunOrigenId ?? asignatura.id)
+  const espaciosSeriacion = espaciosSeriacionAreaComun(areaComun)
+  const esElectivaParaSeriacion = (a: Asignatura) =>
+    Boolean(a.grupoElectivoId) ||
+    esAlternativaElectiva(espaciosSeriacion, a.id, a.areaComunOrigenId)
   const fuenteElectiva = (id: string) =>
     asignaturas.find((asignatura) => asignatura.id === id) ??
     areaComun?.contenido?.asignaturas.find((asignatura) => asignatura.id === id)
@@ -673,6 +666,163 @@ function MapaCurricularPage() {
           ? asignatura.hi
           : (asignatura.horas_independientes ?? 0),
     }
+  }
+
+  // Filas de presentación: conservan el ID de la línea real al guardar movimientos.
+  const vistaPorBloques = esPlanAreaComun && roleKeys.has('AREA_COMUN')
+  type FilaMapa = LineaCurricularUI & { bloque?: string }
+  const bloqueDeAsignatura = (a: Asignatura) => {
+    const nombre = nombreBloqueAreaComun(a.bloqueAreaComun)
+    return BLOQUES_AREA_COMUN.some((b) => b.nombre === nombre)
+      ? nombre!
+      : 'Sin bloque'
+  }
+  const bloqueDeGrupo = (e: EspacioAreaComun) => {
+    const bloques = new Set(
+      (e.opciones ?? []).map((id) => {
+        const materia = asignaturas.find((a) => a.id === id)
+        return materia ? bloqueDeAsignatura(materia) : 'Sin bloque'
+      }),
+    )
+    return bloques.size === 1 ? [...bloques][0] : 'Sin bloque'
+  }
+  const perteneceFila = (a: Asignatura, fila: FilaMapa) =>
+    a.lineaCurricularId === fila.id &&
+    (!fila.bloque || bloqueDeAsignatura(a) === fila.bloque)
+  const filasMapa: Array<FilaMapa> = lineas.flatMap(
+    (linea): Array<FilaMapa> => {
+      if (!vistaPorBloques || linea.id !== lineaAreaComunId) return [linea]
+      const filas: Array<FilaMapa> = BLOQUES_AREA_COMUN.map((b) => ({
+        ...linea,
+        nombre: b.nombre,
+        color: b.color,
+        bloque: b.nombre,
+      }))
+      if (
+        asignaturas.some(
+          (a) =>
+            a.lineaCurricularId === linea.id &&
+            bloqueDeAsignatura(a) === 'Sin bloque',
+        ) ||
+        espaciosElectivos.some((e) => bloqueDeGrupo(e) === 'Sin bloque')
+      ) {
+        filas.push({ ...linea, nombre: 'Sin bloque', bloque: 'Sin bloque' })
+      }
+      return filas
+    },
+  )
+
+  const asignaturasConCargaUnica = alternativasSinDuplicarCarga(
+    asignaturas,
+    (a) => a.grupoElectivoId,
+  )
+  const repartoElectivoVariable = gruposPropios.some((g) => {
+    const opciones = asignaturas.filter((a) => a.grupoElectivoId === g.id)
+    return opciones.some(
+      (a) => a.hd !== opciones[0]?.hd || a.hi !== opciones[0]?.hi,
+    )
+  })
+  const motivoGrupo = async () =>
+    capabilities.requiresAdminOverrideForEdit
+      ? requestAdminOverrideReason(
+          'editar bloques electivos fuera de la etapa normal del plan',
+        )
+      : null
+  const ejecutarGrupo = async (
+    grupo: GrupoElectivoPlan,
+    operacion: OperacionGrupoElectivo['operacion'],
+    datos: OperacionGrupoElectivo['datos'] = {},
+  ) => {
+    if (!canEditMapa || gestionGrupo.isPending) return
+    let confirmar = false
+    if (operacion === 'incorporar') {
+      const a = asignaturas.find((m) => m.id === datos.asignatura_id)
+      if (!a) return
+      datos = {
+        ...datos,
+        grupo_origen_esperado: a.grupoElectivoId ?? null,
+        relaciones_esperadas: asignaturas
+          .filter(
+            (m) =>
+              (m.id === a.id && m.prerrequisito_asignatura_id !== null) ||
+              m.prerrequisito_asignatura_id === a.id,
+          )
+          .map((m) => ({
+            id: m.id,
+            prerrequisito_asignatura_id: m.prerrequisito_asignatura_id,
+          }))
+          .sort((x, y) => x.id.localeCompare(y.id)),
+      }
+      const afectadas = asignaturas.filter(
+        (m) =>
+          m.id === a.prerrequisito_asignatura_id ||
+          m.prerrequisito_asignatura_id === a.id,
+      )
+      if (afectadas.length) {
+        confirmar = await showAppConfirm({
+          title: 'Incorporar al bloque electivo',
+          description:
+            'Se retirarán las seriaciones individuales con: ' +
+            afectadas.map((m) => m.nombre).join(', ') +
+            '.',
+          confirmLabel: 'Retirar relaciones e incorporar',
+          variant: 'destructive',
+        })
+        if (!confirmar) return
+      }
+    }
+    if (operacion === 'eliminar') {
+      const relacionadas = gruposPropios.filter(
+        (g) =>
+          g.prerrequisito_grupo_id === grupo.id ||
+          g.id === grupo.prerrequisito_grupo_id,
+      )
+      confirmar = await showAppConfirm({
+        title: 'Eliminar bloque electivo',
+        description:
+          'Sus asignaturas se conservarán como pendientes de ubicar.' +
+          (relacionadas.length
+            ? ' Se retirarán las dependencias con: ' +
+              relacionadas.map((g) => g.nombre).join(', ') +
+              '.'
+            : ''),
+        confirmLabel: 'Eliminar bloque',
+        variant: 'destructive',
+      })
+      if (!confirmar) return
+    }
+    const motivo = await motivoGrupo()
+    if (capabilities.requiresAdminOverrideForEdit && !motivo) return
+    await gestionGrupo.mutateAsync({
+      planId,
+      grupoId: grupo.id,
+      operacion,
+      datos: {
+        ...datos,
+        revision: grupo.revision,
+        confirmar_retiro_relaciones: confirmar,
+      },
+      adminOverrideReason: motivo,
+    })
+  }
+  const crearGrupo = async (ciclo: number, linea: string) => {
+    const nombre = await showAppPrompt({
+      title: 'Agregar bloque electivo',
+      label: 'Nombre',
+      placeholder: 'Obligatoria Electiva I',
+      required: true,
+      confirmLabel: 'Crear bloque',
+    })
+    if (!nombre) return
+    const motivo = await motivoGrupo()
+    if (capabilities.requiresAdminOverrideForEdit && !motivo) return
+    await gestionGrupo.mutateAsync({
+      planId,
+      grupoId: crypto.randomUUID(),
+      operacion: 'crear',
+      datos: { nombre, numero_ciclo: ciclo, linea_plan_id: linea },
+      adminOverrideReason: motivo,
+    })
   }
 
   const maxCicloUsado = asignaturas.reduce(
@@ -966,25 +1116,30 @@ function MapaCurricularPage() {
           asignatura.id === editingData.prerrequisito_asignatura_id,
       ) ?? null)
     : null
-  const seriacionesElegibles = editingData
-    ? asignaturas
-        .filter(
-          (asignatura) =>
-            asignatura.id !== editingData.id &&
-            asignatura.ciclo !== null &&
-            editingData.ciclo !== null &&
-            asignatura.ciclo < editingData.ciclo,
-        )
-        .sort(
-          (left, right) =>
-            Number(right.lineaCurricularId === editingData.lineaCurricularId) -
+  const seriacionesElegibles =
+    editingData && areaComun
+      ? asignaturas
+          .filter(
+            (asignatura) =>
+              asignatura.id !== editingData.id &&
+              !esElectivaParaSeriacion(editingData) &&
+              !esElectivaParaSeriacion(asignatura) &&
+              asignatura.ciclo !== null &&
+              editingData.ciclo !== null &&
+              asignatura.ciclo < editingData.ciclo,
+          )
+          .sort(
+            (left, right) =>
               Number(
-                left.lineaCurricularId === editingData.lineaCurricularId,
-              ) ||
-            (right.ciclo ?? 0) - (left.ciclo ?? 0) ||
-            left.nombre.localeCompare(right.nombre, 'es'),
-        )
-    : []
+                right.lineaCurricularId === editingData.lineaCurricularId,
+              ) -
+                Number(
+                  left.lineaCurricularId === editingData.lineaCurricularId,
+                ) ||
+              (right.ciclo ?? 0) - (left.ciclo ?? 0) ||
+              left.nombre.localeCompare(right.nombre, 'es'),
+          )
+      : []
   const muestraControlSeriacion =
     editingSeriada !== null || seriacionesElegibles.length > 0
   const unassignedAsignaturas = asignaturas.filter(
@@ -1004,7 +1159,9 @@ function MapaCurricularPage() {
     lineas.length > 0 ? lineas.map((l) => l.color) : PALETA_LINEAS_CURRICULARES
 
   const asignaturaAMapa = (asignatura: Asignatura): AsignaturaMapa => ({
-    solo_lectura: Boolean(asignatura.areaComunOrigenId),
+    solo_lectura:
+      Boolean(asignatura.areaComunOrigenId) ||
+      esElectivaParaSeriacion(asignatura),
     id: asignatura.id,
     nombre: asignatura.nombre,
     clave: asignatura.clave || null,
@@ -1146,8 +1303,9 @@ function MapaCurricularPage() {
       }))
       .filter(
         (movimiento) =>
-          asignaturas.some((a) => a.id === movimiento.id) &&
-          lineasValidas.has(movimiento.lineaCurricularId),
+          asignaturas.some(
+            (a) => a.id === movimiento.id && !esElectivaParaSeriacion(a),
+          ) && lineasValidas.has(movimiento.lineaCurricularId),
       )
 
     if (movimientos.length > 0) {
@@ -1174,6 +1332,14 @@ function MapaCurricularPage() {
         prerrequisito: seriacion.prerrequisito_asignatura_id,
       }))
       .filter((seriacion) => {
+        if (
+          asignaturas.some(
+            (a) =>
+              (a.id === seriacion.id || a.id === seriacion.prerrequisito) &&
+              esElectivaParaSeriacion(a),
+          )
+        )
+          return false
         if (seriacion.prerrequisito === null) return true
         const propio = posicionFinal.get(seriacion.id) ?? null
         const previo = posicionFinal.get(seriacion.prerrequisito) ?? null
@@ -1483,7 +1649,7 @@ function MapaCurricularPage() {
 
   // --- Selectores/Cálculos ---
   const getTotalesCiclo = (cicloNumero: number) => {
-    const totales = asignaturas
+    const totales = asignaturasConCargaUnica
       .filter(
         (m) =>
           m.ciclo === cicloNumero && !(esPlanAreaComun && esOpcionElectiva(m)),
@@ -1510,7 +1676,7 @@ function MapaCurricularPage() {
   }
 
   const getSubtotalLinea = (lineaId: string) => {
-    const totales = asignaturas
+    const totales = asignaturasConCargaUnica
       .filter(
         (m) =>
           m.lineaCurricularId === lineaId &&
@@ -1538,6 +1704,7 @@ function MapaCurricularPage() {
 
   const limpiarArrastre = () => {
     setDraggedAsignatura(null)
+    setGrupoArrastradoId(null)
   }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
@@ -1571,7 +1738,41 @@ function MapaCurricularPage() {
     if (!canEditMapa) return
     const asignaturaId =
       draggedAsignatura || e.dataTransfer.getData('text/plain')
+    const grupoId =
+      grupoArrastradoId ??
+      (asignaturaId.startsWith('grupo-propio:')
+        ? asignaturaId.slice('grupo-propio:'.length)
+        : null)
+    if (grupoId) {
+      const grupo = gruposPropios.find((g) => g.id === grupoId)
+      if (grupo && cicloDestino !== null && lineaId) {
+        try {
+          await ejecutarGrupo(grupo, 'mover', {
+            numero_ciclo: cicloDestino,
+            linea_plan_id: lineaId,
+          })
+        } finally {
+          limpiarArrastre()
+        }
+      } else {
+        limpiarArrastre()
+        notify.error('Ubica el bloque en una celda del mapa.')
+      }
+      return
+    }
     if (!asignaturaId) return
+    const alternativa = asignaturas.find(
+      (a) => a.id === asignaturaId && a.grupoElectivoId,
+    )
+    if (alternativa) {
+      const grupo = gruposPropios.find(
+        (g) => g.id === alternativa.grupoElectivoId,
+      )
+      if (grupo)
+        await ejecutarGrupo(grupo, 'retirar', { asignatura_id: asignaturaId })
+      limpiarArrastre()
+      return
+    }
 
     try {
       // Solo disparamos la lógica si realmente hay un cambio de posición
@@ -1600,7 +1801,7 @@ function MapaCurricularPage() {
   }, [])
 
   const stats = (() => {
-    const totales = asignaturas.reduce(
+    const totales = asignaturasConCargaUnica.reduce(
       (acc, m) => {
         if (m.ciclo !== null && !(esPlanAreaComun && esOpcionElectiva(m))) {
           acc.cr += m.creditos || 0
@@ -1673,7 +1874,7 @@ function MapaCurricularPage() {
       return colorPorLinea.get(lineaId) ?? null
     }
 
-    return asignaturas
+    const individuales = asignaturas
       .filter((asignatura) => asignatura.prerrequisito_asignatura_id)
       .map((asignatura) => {
         const source = asignatura.prerrequisito_asignatura_id as string
@@ -1691,11 +1892,29 @@ function MapaCurricularPage() {
           ),
         }
       })
-  }, [asignaturas, lineas])
+    return [
+      ...individuales,
+      ...gruposPropios
+        .filter((g) => g.prerrequisito_grupo_id)
+        .map((g) => ({
+          source: 'propio-' + g.prerrequisito_grupo_id,
+          target: 'propio-' + g.id,
+          colorOrigen: colorPorLinea.get(g.linea_plan_id) ?? null,
+          colorDestino: colorPorLinea.get(g.linea_plan_id) ?? null,
+          degradado: false,
+        })),
+      ...aristasSeriacionGrupos(espaciosElectivos).map((arista) => ({
+        ...arista,
+        colorOrigen: colorPorLinea.get(lineaAreaComunId ?? '') ?? null,
+        colorDestino: colorPorLinea.get(lineaAreaComunId ?? '') ?? null,
+        degradado: false,
+      })),
+    ]
+  }, [asignaturas, lineas, espaciosElectivos, lineaAreaComunId, gruposPropios])
 
   const highlightedChainIds = useMemo(
-    () => buildChainIds(hoveredAsignaturaId, asignaturas),
-    [hoveredAsignaturaId, asignaturas],
+    () => obtenerCadenaSeriacion(hoveredAsignaturaId, seriacionEdges),
+    [hoveredAsignaturaId, seriacionEdges],
   )
 
   const renderSeriacionEdges = (soloDestacadas: boolean) =>
@@ -1793,7 +2012,15 @@ function MapaCurricularPage() {
     })
 
     return () => window.cancelAnimationFrame(frame)
-  }, [asignaturas, lineas, totalCiclos, refreshCardRects])
+  }, [
+    asignaturas,
+    lineas,
+    totalCiclos,
+    distribucionComun,
+    gruposPropios,
+    vistaPorBloques,
+    refreshCardRects,
+  ])
 
   useEffect(() => {
     const overlay = mapOverlayRef.current
@@ -1962,6 +2189,11 @@ function MapaCurricularPage() {
         />
       )}
 
+      {errorGrupos && (
+        <p role="alert" className="text-destructive text-sm">
+          No se pudieron cargar los bloques electivos: {errorGrupos.message}
+        </p>
+      )}
       <div className="pb-seccion overflow-x-auto">
         <div ref={mapOverlayRef} className="relative">
           <svg
@@ -2017,11 +2249,37 @@ function MapaCurricularPage() {
               SUBTOTAL
             </div>
 
-            {lineas.map((linea) => {
-              const sub = getSubtotalLinea(linea.id)
+            {filasMapa.map((linea) => {
+              const sub = linea.bloque
+                ? asignaturas
+                    .filter(
+                      (a) =>
+                        perteneceFila(a, linea) &&
+                        a.ciclo !== null &&
+                        !esOpcionElectiva(a),
+                    )
+                    .reduce(
+                      (acc, a) => ({
+                        cr: acc.cr + a.creditos,
+                        hd: acc.hd + a.hd,
+                        hi: acc.hi + a.hi,
+                      }),
+                      { cr: 0, hd: 0, hi: 0 },
+                    )
+                : getSubtotalLinea(linea.id)
+              if (linea.bloque) {
+                for (const grupo of espaciosElectivos.filter(
+                  (e) => bloqueDeGrupo(e) === linea.bloque,
+                )) {
+                  const carga = horasElectiva(grupo.opciones?.[0] ?? '')
+                  sub.cr += carga.creditos
+                  sub.hd += carga.hd
+                  sub.hi += carga.hi
+                }
+              }
 
               return (
-                <Fragment key={linea.id}>
+                <Fragment key={linea.id + (linea.bloque ?? '')}>
                   <div
                     className="group gap-relacionado p-control relative flex flex-col rounded-xl border transition-all"
                     style={{
@@ -2058,7 +2316,23 @@ function MapaCurricularPage() {
                       onDragOver={handleDragOver}
                       onDrop={(e) =>
                         canEditMapa
-                          ? handleDrop(e, cicloNumero, linea.id)
+                          ? (() => {
+                              const materia = asignaturas.find(
+                                (a) => a.id === draggedAsignatura,
+                              )
+                              if (
+                                linea.bloque &&
+                                materia &&
+                                bloqueDeAsignatura(materia) !== linea.bloque
+                              ) {
+                                e.preventDefault()
+                                notify.error(
+                                  'Mueve la asignatura dentro de la fila de su bloque.',
+                                )
+                                return
+                              }
+                              handleDrop(e, cicloNumero, linea.id)
+                            })()
                           : undefined
                       }
                       className={`gap-relacionado p-relacionado flex min-h-48 flex-col rounded-xl border border-dashed transition-colors ${
@@ -2071,8 +2345,9 @@ function MapaCurricularPage() {
                         .filter(
                           (m) =>
                             m.ciclo === cicloNumero &&
-                            m.lineaCurricularId === linea.id &&
-                            !esOpcionElectiva(m),
+                            perteneceFila(m, linea) &&
+                            !esOpcionElectiva(m) &&
+                            !m.grupoElectivoId,
                         )
                         .map((m) =>
                           (() => {
@@ -2155,34 +2430,164 @@ function MapaCurricularPage() {
                       {linea.id === lineaAreaComunId &&
                         espaciosElectivos
                           .filter(
-                            (espacio) => espacio.numero_ciclo === cicloNumero,
+                            (espacio) =>
+                              espacio.numero_ciclo === cicloNumero &&
+                              (!linea.bloque ||
+                                bloqueDeGrupo(espacio) === linea.bloque),
                           )
                           .map((espacio, index) => (
-                            <button
-                              key={espacio.clave}
-                              type="button"
-                              onClick={() => setElectivaActiva(espacio)}
-                              className="border-primary/35 bg-card hover:border-primary organic-interactive p-grupo flex h-44 min-h-44 w-40 min-w-40 shrink-0 flex-col items-center justify-between rounded-xl border text-center"
-                              aria-label={`Abrir ${espacio.nombre ?? `Electiva ${index + 1}`} en ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
-                            >
-                              <span className="text-muted-foreground block text-xs">
-                                {formatCiclo(data?.tipo_ciclo, cicloNumero)}
-                              </span>
-                              <span className="text-foreground line-clamp-3 flex flex-1 items-center justify-center font-semibold">
-                                {espacio.nombre ?? `Electiva ${index + 1}`}
-                              </span>
-                              <span className="text-muted-foreground text-xs">
-                                {espacio.opciones?.length ?? 0} opciones · Ver
-                                catálogo
-                              </span>
-                            </button>
+                            <Tooltip key={espacio.clave}>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  ref={(element) => {
+                                    cardRefs.current['grupo-' + espacio.clave] =
+                                      element
+                                  }}
+                                  onMouseEnter={() =>
+                                    setHoveredAsignaturaId(
+                                      'grupo-' + espacio.clave,
+                                    )
+                                  }
+                                  onMouseLeave={() =>
+                                    setHoveredAsignaturaId(null)
+                                  }
+                                  onFocus={() =>
+                                    setHoveredAsignaturaId(
+                                      'grupo-' + espacio.clave,
+                                    )
+                                  }
+                                  onBlur={() => setHoveredAsignaturaId(null)}
+                                  type="button"
+                                  onClick={() => setElectivaActiva(espacio)}
+                                  className={cn(
+                                    'border-primary/35 bg-card hover:border-primary organic-interactive p-grupo flex h-44 min-h-44 w-40 min-w-40 shrink-0 flex-col items-center justify-between rounded-xl border text-center whitespace-normal',
+                                    highlightedChainIds &&
+                                      !highlightedChainIds.has(
+                                        'grupo-' + espacio.clave,
+                                      )
+                                      ? 'opacity-25'
+                                      : 'opacity-100',
+                                  )}
+                                  aria-label={`Abrir ${espacio.nombre ?? `Electiva ${index + 1}`} en ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
+                                >
+                                  <span className="text-muted-foreground block text-xs">
+                                    {formatCiclo(data?.tipo_ciclo, cicloNumero)}
+                                  </span>
+                                  <span className="text-foreground line-clamp-3 flex flex-1 items-center justify-center font-semibold">
+                                    {espacio.nombre ?? `Electiva ${index + 1}`}
+                                  </span>
+                                  <span className="text-muted-foreground text-xs">
+                                    {espacio.opciones?.length ?? 0} opciones ·
+                                    Ver catálogo
+                                  </span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom">
+                                <div className="text-lg">
+                                  <span className="font-bold">
+                                    C{espacio.numero_ciclo} ·{' '}
+                                  </span>
+                                  <span className="font-medium">
+                                    {linea.nombre} ·{' '}
+                                  </span>
+                                  {espacio.nombre ?? 'Electiva ' + (index + 1)}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
                           ))}
+
+                      {gruposPropios
+                        .filter(
+                          (g) =>
+                            g.linea_plan_id === linea.id &&
+                            g.numero_ciclo === cicloNumero,
+                        )
+                        .map((grupo) => (
+                          <GrupoElectivoPropio
+                            key={grupo.id}
+                            grupo={grupo}
+                            grupos={gruposPropios}
+                            asignaturas={asignaturaApi ?? []}
+                            editable={canEditMapa}
+                            pendiente={gestionGrupo.isPending}
+                            atenuado={Boolean(
+                              highlightedChainIds &&
+                              !highlightedChainIds.has('propio-' + grupo.id),
+                            )}
+                            registrar={(elemento) => {
+                              cardRefs.current['propio-' + grupo.id] = elemento
+                            }}
+                            onHover={(activo) =>
+                              setHoveredAsignaturaId(
+                                activo ? 'propio-' + grupo.id : null,
+                              )
+                            }
+                            onArrastrar={(e) => {
+                              setGrupoArrastradoId(grupo.id)
+                              e.dataTransfer.setData(
+                                'text/plain',
+                                'grupo-propio:' + grupo.id,
+                              )
+                              e.dataTransfer.effectAllowed = 'move'
+                            }}
+                            onFinArrastre={limpiarArrastre}
+                            onSoltarAsignatura={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              if (!canEditMapa || gestionGrupo.isPending) return
+                              const id =
+                                draggedAsignatura ||
+                                e.dataTransfer.getData('text/plain')
+                              if (id && !id.startsWith('grupo-propio:'))
+                                void ejecutarGrupo(grupo, 'incorporar', {
+                                  asignatura_id: id,
+                                })
+                                  .catch(() => undefined)
+                                  .finally(limpiarArrastre)
+                            }}
+                            ejecutar={ejecutarGrupo}
+                            onAbrirAsignatura={(id) => {
+                              const materia = asignaturas.find(
+                                (a) => a.id === id,
+                              )
+                              if (materia) {
+                                setEditingData(materia)
+                                setIsEditModalOpen(true)
+                              }
+                            }}
+                          />
+                        ))}
+                      {canEditMapa &&
+                        !esPlanAreaComun &&
+                        linea.id !== lineaComunId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={gestionGrupo.isPending}
+                            className="text-muted-foreground whitespace-normal"
+                            onClick={() => {
+                              void crearGrupo(cicloNumero, linea.id).catch(
+                                () => undefined,
+                              )
+                            }}
+                          >
+                            Agregar bloque electivo
+                          </Button>
+                        )}
 
                       {canEditMapa &&
                         linea.id !== lineaComunId &&
                         unassignedAsignaturas.length > 0 && (
                           <CeldaAgregarAsignatura
-                            disponibles={unassignedAsignaturas}
+                            disponibles={
+                              linea.bloque
+                                ? unassignedAsignaturas.filter(
+                                    (a) =>
+                                      bloqueDeAsignatura(a) === linea.bloque,
+                                  )
+                                : unassignedAsignaturas
+                            }
                             ariaLabel={`Asignar una asignatura pendiente a ${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
                             opcionesAgente={opcionesCelda(linea, cicloNumero)}
                             onSelect={(asignaturaId) =>
@@ -2199,7 +2604,12 @@ function MapaCurricularPage() {
                   {/* El subtotal es donde se ve que una línea quedó irregular
                       (un ciclo cargadísimo y el siguiente vacío), así que es
                       donde se ofrece reacomodarla. */}
-                  <AccionAgente opciones={opcionesReorganizar(linea)}>
+                  <AccionAgente
+                    opciones={{
+                      ...opcionesReorganizar(linea),
+                      ...(linea.bloque ? { disabled: true } : {}),
+                    }}
+                  >
                     {(agenteFila) => {
                       const vacia = sub.cr === 0 && sub.hd === 0 && sub.hi === 0
 
@@ -2248,8 +2658,15 @@ function MapaCurricularPage() {
                                     side="bottom"
                                     className="max-w-xs text-sm"
                                   >
-                                    HD {sub.hd} + HI {sub.hi} ={' '}
-                                    {sub.hd + sub.hi} h
+                                    {repartoElectivoVariable
+                                      ? 'Referencia HD'
+                                      : 'HD'}{' '}
+                                    {sub.hd} + HI {sub.hi} = {sub.hd + sub.hi} h
+                                    {repartoElectivoVariable && (
+                                      <span className="block">
+                                        HD/HI según alternativa electiva
+                                      </span>
+                                    )}
                                   </TooltipContent>
                                 </Tooltip>
                               )}
@@ -2315,7 +2732,13 @@ function MapaCurricularPage() {
                           side="bottom"
                           className="max-w-xs text-sm"
                         >
-                          HD {t.hd} + HI {t.hi} = {t.hd + t.hi} h
+                          {repartoElectivoVariable ? 'Referencia HD' : 'HD'}{' '}
+                          {t.hd} + HI {t.hi} = {t.hd + t.hi} h
+                          {repartoElectivoVariable && (
+                            <span className="block">
+                              HD/HI según alternativa electiva
+                            </span>
+                          )}
                         </TooltipContent>
                       </Tooltip>
                     </>
@@ -2334,7 +2757,13 @@ function MapaCurricularPage() {
                     <span>{stats.hd + stats.hi} h</span>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs text-sm">
-                    HD {stats.hd} + HI {stats.hi} = {stats.hd + stats.hi} h
+                    {repartoElectivoVariable ? 'Referencia HD' : 'HD'}{' '}
+                    {stats.hd} + HI {stats.hi} = {stats.hd + stats.hi} h
+                    {repartoElectivoVariable && (
+                      <span className="block">
+                        HD/HI según alternativa electiva
+                      </span>
+                    )}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -2367,6 +2796,12 @@ function MapaCurricularPage() {
                 {electivaActiva.opciones?.length ?? 0} opciones disponibles
               </DialogDescription>
             </DialogHeader>
+            <GrupoSeriacionControl
+              contexto={areaComun}
+              distribucion={distribucionComun}
+              grupoClave={electivaActiva.clave}
+              editable={esPlanAreaComun && canEditMapa}
+            />
             <div className="gap-grupo flex flex-wrap">
               {(electivaActiva.opciones ?? []).map((id) => {
                 const original = fuenteElectiva(id)
@@ -2871,6 +3306,29 @@ function MapaCurricularPage() {
                       : 'justify-items-center',
                   )}
                 >
+                  {esElectivaParaSeriacion(editingData) && (
+                    <p className="text-muted-foreground text-sm">
+                      Seriación del grupo:{' '}
+                      {espaciosElectivos.find(
+                        (e) =>
+                          e.clave ===
+                          espaciosElectivos.find((g) =>
+                            g.opciones?.includes(
+                              editingData.areaComunOrigenId ?? editingData.id,
+                            ),
+                          )?.prerrequisito_grupo_clave,
+                      )?.nombre ?? 'Sin seriación'}
+                    </p>
+                  )}
+                  {editingSeriada &&
+                    (esElectivaParaSeriacion(editingData) ||
+                      esElectivaParaSeriacion(editingSeriada)) && (
+                      <p role="alert" className="text-destructive text-sm">
+                        Esta alternativa conserva una seriación individual
+                        incompatible. Quita la relación y configura la seriación
+                        desde su grupo.
+                      </p>
+                    )}
                   {muestraControlSeriacion && (
                     <Popover
                       open={

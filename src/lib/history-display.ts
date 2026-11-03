@@ -192,6 +192,9 @@ export function getHistoryGroupForChange(input: {
 
   if (isHistoryTransitionChange(tipo, campo)) return HISTORY_GROUPS.transiciones
 
+  if (campo === 'grupos_electivos' || campo === 'grupo_electivo_id')
+    return HISTORY_GROUPS.mapa_curricular
+
   if (source === 'asignatura') {
     if (
       tipo === 'ACTUALIZACION_MAPA' ||
@@ -417,11 +420,7 @@ const FIELD_NOUN: Record<string, { frase: string; plural?: boolean }> = {
 }
 
 export type HistoryChangeKind =
-  | 'creacion'
-  | 'alta'
-  | 'baja'
-  | 'edicion'
-  | 'transicion'
+  'creacion' | 'alta' | 'baja' | 'edicion' | 'transicion'
 
 export type HistoryChangeDescription = {
   /** Frase completa, autoexplicativa, lista para mostrarse. */

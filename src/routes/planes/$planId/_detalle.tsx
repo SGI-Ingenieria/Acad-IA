@@ -107,6 +107,7 @@ import {
 import { formatCiclo, nombreTipoCiclo, sinCicloLabel } from '@/lib/ciclo-utils'
 import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
+import { alternativasSinDuplicarCarga } from '@/lib/grupos-electivos'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -995,7 +996,7 @@ function RouteComponent() {
               <div className="shrink-0 text-right">
                 <p className="text-primary text-3xl leading-none font-bold tabular-nums">
                   {asignaturasData
-                    ? asignaturasData
+                    ? alternativasSinDuplicarCarga(asignaturasData)
                         .reduce((sum, a) => sum + (a.creditos ?? 0), 0)
                         .toFixed(2)
                     : '—'}
@@ -1039,10 +1040,9 @@ function RouteComponent() {
             {asignaturasData && asignaturasData.length > 0 ? (
               <div className="space-y-seccion">
                 {gruposDesglose.map((grupo) => {
-                  const totalCicloCr = grupo.asignaturas.reduce(
-                    (s, a) => s + (a.creditos ?? 0),
-                    0,
-                  )
+                  const totalCicloCr = alternativasSinDuplicarCarga(
+                    grupo.asignaturas,
+                  ).reduce((s, a) => s + (a.creditos ?? 0), 0)
                   return (
                     <div key={grupo.titulo} data-credito-grupo>
                       {/* Cabecera del grupo */}

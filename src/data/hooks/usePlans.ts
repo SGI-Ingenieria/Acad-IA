@@ -205,6 +205,7 @@ export function usePlanAsignaturas(
         // terminar.
         if (
           qc.isMutating({ mutationKey: mk.planMapa() }) > 0 ||
+          qc.isMutating({ mutationKey: mk.gruposElectivos(planId) }) > 0 ||
           qc.isMutating({ mutationKey: mk.asignaturaUpdate() }) > 0 ||
           qc.isMutating({ mutationKey: mk.asignaturaGenerar() }) > 0
         ) {

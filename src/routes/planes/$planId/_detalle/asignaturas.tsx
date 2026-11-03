@@ -77,6 +77,7 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import { useGruposElectivos } from '@/data/hooks/useGruposElectivos'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   planAsignaturasOptions,
@@ -179,6 +180,7 @@ function AsignaturasPage() {
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
   const tipoCiclo = plan?.tipo_ciclo
 
+  const { data: gruposElectivos = [] } = useGruposElectivos(planId)
   // 3. Procesamiento de datos
   const asignaturas = useMemo(
     () => mapAsignaturas(asignaturaApi as Array<Tables<'asignaturas'>>),
@@ -568,6 +570,14 @@ function AsignaturasPage() {
                     </TableCell>
                     <TableCell className="text-foreground px-seccion py-grupo min-w-56 text-base leading-snug font-semibold whitespace-normal">
                       {asignatura.nombre}
+                      {asignatura.grupoElectivoId && (
+                        <span className="text-muted-foreground mt-micro block text-xs font-normal">
+                          Alternativa ·{' '}
+                          {gruposElectivos.find(
+                            (g) => g.id === asignatura.grupoElectivoId,
+                          )?.nombre ?? 'Bloque electivo'}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="px-seccion py-grupo text-center text-base font-semibold tabular-nums">
                       {asignatura.creditos}
