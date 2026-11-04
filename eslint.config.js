@@ -20,6 +20,7 @@ export default [
       // Edge Functions de Supabase: corren en Deno con su propio toolchain
       // (deno.json por función) y quedan fuera del tsconfig del frontend.
       'supabase/functions/**',
+      'android/**', // Kotlin/Compose has its own Android Lint toolchain.
     ],
   },
 

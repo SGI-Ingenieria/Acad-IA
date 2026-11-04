@@ -22,3 +22,11 @@ deploy/helm/**/templates/**
 deploy/helm/**/files/envoy/**
 deploy/docker-bake.hcl
 supabase/api/envoy/**
+
+# Gradle caches, generated resources and local-only Android configuration
+android/**/build/**
+android/.gradle/**
+android/.kotlin/**
+android/.idea/**
+android/local.properties
+android/preview.properties
