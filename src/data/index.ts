@@ -31,6 +31,7 @@ export * from './api/usuarios.api'
 export * from './api/recursos.api'
 export * from './api/paquetes.api'
 export * from './api/importaciones.api'
+export * from './api/bugReports.api'
 
 export * from './hooks/useAuth'
 export * from './hooks/useInicio'

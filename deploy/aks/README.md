@@ -142,6 +142,12 @@ RUSTFS_SECRET_ACCESS_KEY
 AZURE_SWA_DEPLOYMENT_TOKEN
 ```
 
+Para publicar reportes desde una Edge Function hospedada mediante un token
+fine-grained, configure opcionalmente `GITHUB_BUG_REPORT_TOKEN` en el
+environment correspondiente. Debe tener seleccionado el repositorio
+`SGI-Ingenieria/Acad-IA`, Metadata en lectura e Issues en lectura/escritura.
+No use el `GITHUB_TOKEN` automático de GitHub Actions para este propósito.
+
 Variables para la publicación manual a Vaultwarden:
 
 ```text
