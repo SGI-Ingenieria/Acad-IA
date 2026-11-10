@@ -142,11 +142,13 @@ RUSTFS_SECRET_ACCESS_KEY
 AZURE_SWA_DEPLOYMENT_TOKEN
 ```
 
-Para publicar reportes desde una Edge Function hospedada mediante un token
-fine-grained, configure opcionalmente `GITHUB_BUG_REPORT_TOKEN` en el
-environment correspondiente. Debe tener seleccionado el repositorio
-`SGI-Ingenieria/Acad-IA`, Metadata en lectura e Issues en lectura/escritura.
-No use el `GITHUB_TOKEN` automático de GitHub Actions para este propósito.
+Para crear issues desde una Edge Function hospedada, configure un token
+fine-grained para `SGI-Ingenieria/Acad-IA` con Metadata en lectura e Issues en
+lectura/escritura. En GitHub Actions, use `ACADIA_BUG_REPORT_TOKEN` en el
+environment de preview. El workflow lo sincroniza a Supabase como
+`GITHUB_BUG_REPORT_TOKEN`. Si configura Supabase de producción directamente,
+guarde el token en los secretos de Edge Functions como `GITHUB_BUG_REPORT_TOKEN`.
+Los permisos para crear issues no garantizan la carga de imágenes.
 
 Variables para la publicación manual a Vaultwarden:
 
