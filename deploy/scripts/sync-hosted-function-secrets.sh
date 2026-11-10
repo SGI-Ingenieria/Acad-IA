@@ -24,6 +24,12 @@ function_secret_names=(
   USER_CREATION_MASTER_PASSWORD
 )
 
+# Optional because existing environments may not have bug-report publishing
+# configured yet. Never use the GitHub Actions built-in GITHUB_TOKEN here.
+optional_function_secret_names=(
+  GITHUB_BUG_REPORT_TOKEN
+)
+
 secret_args=()
 missing=()
 for name in "${function_secret_names[@]}"; do
@@ -31,6 +37,13 @@ for name in "${function_secret_names[@]}"; do
   if [[ -z "$value" ]]; then
     missing+=("$name")
   else
+    secret_args+=("$name=$value")
+  fi
+done
+
+for name in "${optional_function_secret_names[@]}"; do
+  value="${!name:-}"
+  if [[ -n "$value" ]]; then
     secret_args+=("$name=$value")
   fi
 done
@@ -48,6 +61,9 @@ fi
 supabase secrets set "${secret_args[@]}" --project-ref "$project_ref"
 
 expected_names=("${function_secret_names[@]}")
+for name in "${optional_function_secret_names[@]}"; do
+  [[ -z "${!name:-}" ]] || expected_names+=("$name")
+done
 [[ -z "$frontend_url" ]] || expected_names+=(FRONTEND_URL)
 remote_secrets_json="$(
   supabase secrets list --project-ref "$project_ref" --output json

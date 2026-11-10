@@ -1,6 +1,7 @@
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   BookOpenText,
+  Bug,
   GraduationCap,
   LayoutDashboard,
   LogIn,
@@ -32,6 +33,7 @@ import {
   adminSections,
   canSeeAdminSection,
 } from '@/features/administracion/sections'
+import { BugReportDialog } from '@/features/bug-reports/BugReportDialog'
 import {
   hayGuiaParaRuta,
   INICIAR_GUIA_EVENT,
@@ -132,6 +134,7 @@ export default function Header() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme())
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [bugReportOpen, setBugReportOpen] = useState(false)
   const { data: session } = useSession()
   const permissions = usePermissions()
   const navigate = useNavigate()
@@ -234,6 +237,20 @@ export default function Header() {
           </button>
           {isAuthenticated ? (
             <div className="gap-relacionado ml-auto flex items-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label="Reportar un problema"
+                    onClick={() => setBugReportOpen(true)}
+                  >
+                    <Bug className="size-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reportar un problema</TooltipContent>
+              </Tooltip>
               {hayGuia && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -370,6 +387,7 @@ export default function Header() {
           </div>
         </div>
       </aside>
+      <BugReportDialog open={bugReportOpen} onOpenChange={setBugReportOpen} />
     </>
   )
 }
