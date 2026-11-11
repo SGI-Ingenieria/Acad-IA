@@ -46,6 +46,7 @@ readonly SECRET_MAP=(
   'smtp-pass:SMTP_PASS'
   'smtp-sender-name:SMTP_SENDER_NAME'
   'sgu-ntlm-url:SGU_NTLM_URL'
+  'github-bug-report-token:GITHUB_BUG_REPORT_TOKEN'
   'github-app-id:GITHUB_APP_ID'
   'github-app-installation-id:GITHUB_APP_INSTALLATION_ID'
   'github-app-private-key:GITHUB_APP_PRIVATE_KEY'
