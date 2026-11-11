@@ -150,6 +150,12 @@ environment de preview. El workflow lo sincroniza a Supabase como
 guarde el token en los secretos de Edge Functions como `GITHUB_BUG_REPORT_TOKEN`.
 Los permisos para crear issues no garantizan la carga de imágenes.
 
+Para AKS, guarde `ACADIA_BUG_REPORT_TOKEN` en el environment `production`
+de GitHub Actions. Ejecute el workflow `backend-aks.yml` con
+`sync_external_secrets` activado para guardar el valor en Azure Key Vault como
+`github-bug-report-token`, sincronizar el Secret de Kubernetes y reiniciar
+los pods. La Edge Function lo recibe como `GITHUB_BUG_REPORT_TOKEN`.
+
 Variables para la publicación manual a Vaultwarden:
 
 ```text
