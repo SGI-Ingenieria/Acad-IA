@@ -31,7 +31,7 @@ const observabilityDb = supabase as any
 declare const EdgeRuntime: {
   waitUntil: (promise: Promise<unknown>) => void
 }
-
+//REDESPLIEGUE PARA AGREGAR TOKEN
 type ObservabilityMetadata = ResponseMetadata & {
   accion?: string
   observability_test_run_id?: string
