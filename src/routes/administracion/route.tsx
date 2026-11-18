@@ -48,7 +48,7 @@ function AdministracionLayout() {
 
         <nav
           aria-label="Secciones de administración"
-          className="bg-muted text-muted-foreground gap-micro p-micro flex w-full items-center rounded-md"
+          className="bg-muted text-muted-foreground gap-micro p-micro flex w-full min-w-0 items-center overflow-x-auto rounded-md"
         >
           {visibleSections.map((section) => {
             const Icon = section.icon
@@ -56,10 +56,10 @@ function AdministracionLayout() {
               <Link
                 key={section.to}
                 to={section.to}
-                className="hover:text-foreground gap-relacionado px-control py-relacionado flex flex-1 items-center justify-center rounded-sm text-sm font-medium whitespace-nowrap transition-colors"
+                className="hover:text-foreground gap-relacionado px-control py-relacionado flex flex-none items-center justify-center rounded-sm text-sm font-medium whitespace-nowrap transition-colors sm:flex-1"
                 activeProps={{
                   className:
-                    'bg-background text-foreground flex flex-1 items-center justify-center gap-relacionado rounded-sm px-control py-relacionado text-sm font-medium whitespace-nowrap shadow-sm',
+                    'bg-background text-foreground flex flex-none items-center justify-center gap-relacionado rounded-sm px-control py-relacionado text-sm font-medium whitespace-nowrap shadow-sm sm:flex-1',
                 }}
               >
                 <Icon className="h-4 w-4 shrink-0" />
