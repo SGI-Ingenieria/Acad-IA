@@ -2,6 +2,7 @@ import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import {
   Bold,
   Copy,
+  FileText,
   Heading1,
   Heading2,
   Heading3,
@@ -769,9 +770,21 @@ function CanvasBody({
               ref={readOnlyRef}
               data-comment-scope={commentScope}
               data-comment-key={campo.clave}
-              className={cn(expanded && 'flex-1')}
+              className={cn('h-full', expanded && 'flex-1')}
             >
-              <RichTextContent html={readOnlyHtml} />
+              {isEmptyRichText(readOnlyHtml) ? (
+                <div
+                  className={cn(
+                    'text-muted-foreground gap-relacionado px-seccion py-region flex min-h-40 flex-col items-center justify-center text-center',
+                    destacado && 'h-full min-h-0',
+                  )}
+                >
+                  <FileText className="text-muted-foreground/70 size-6" />
+                  <span className="text-sm font-medium">Sin contenido</span>
+                </div>
+              ) : (
+                <RichTextContent html={readOnlyHtml} />
+              )}
             </div>
           )}
         </div>
