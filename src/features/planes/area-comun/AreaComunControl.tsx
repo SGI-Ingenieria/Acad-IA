@@ -78,6 +78,11 @@ export function AreaComunControl({
       </Button>
     )
   const ctx = contexto.data
+  const bloqueoIncorporacion = !ctx.publicacion_id
+    ? 'Área común sin publicar'
+    : !ctx.distribucion
+      ? 'Sin distribución compatible de Área común'
+      : null
 
   const publicar = async () => {
     const confirmado = await showAppConfirm({
@@ -135,11 +140,17 @@ export function AreaComunControl({
         editable &&
         plan.estructuras_plan?.tipo === 'CURRICULAR' && (
           <>
-            <Button variant="outline" onClick={() => setAbierto(true)}>
-              {ctx.incorporacion
-                ? 'Electivas de Área común'
-                : 'Agregar línea de Área común'}
-            </Button>
+            {bloqueoIncorporacion ? (
+              <span className="text-muted-foreground text-sm" role="status">
+                {bloqueoIncorporacion}
+              </span>
+            ) : (
+              <Button variant="outline" onClick={() => setAbierto(true)}>
+                {ctx.incorporacion
+                  ? 'Electivas de Área común'
+                  : 'Agregar línea de Área común'}
+              </Button>
+            )}
             {ctx.incorporacion && (
               <Button
                 variant="ghost"
@@ -202,7 +213,11 @@ function IncorporacionEditor({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Área curricular común</DialogTitle>
+        <DialogTitle>
+          {contexto.incorporacion
+            ? 'Electivas de Área común'
+            : 'Agregar línea de Área común'}
+        </DialogTitle>
       </DialogHeader>
       {!contexto.publicacion_id ? (
         <p role="status">Área común aún no tiene una publicación.</p>

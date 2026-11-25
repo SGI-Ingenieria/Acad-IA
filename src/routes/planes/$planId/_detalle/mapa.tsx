@@ -100,6 +100,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
+  useExportarMapaExcel,
   usePlan,
   usePlanAsignaturas,
   usePlanLineas,
@@ -107,7 +108,6 @@ import {
   useUpdatePlanFields,
   useUpdatePlanDesignPhase,
 } from '@/data'
-import { fetchPlanExcel } from '@/data/api/document.api'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -467,7 +467,24 @@ function MapaCurricularPage() {
     usePlanAsignaturas(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
   const [asignaturas, setAsignaturas] = useState<Array<Asignatura>>([])
-  const [lineas, setLineas] = useState<Array<LineaCurricularUI>>([])
+  const esPlanAreaComun = data?.categoria === 'AREA_COMUN'
+  const lineas = useMemo(() => {
+    const lineasPlan = mapLineasToLineaCurricular(lineasApi)
+    if (!data || esPlanAreaComun || !areaComun || !asignaturaApi) {
+      return lineasPlan
+    }
+
+    // Las filas antiguas vacías no representan una incorporación.
+    return lineasPlan.filter(
+      (linea) =>
+        linea.id === lineaComunId ||
+        (linea.nombre !== '2. Área curricular común' &&
+          linea.nombre !== 'Área curricular común básica') ||
+        asignaturaApi.some(
+          (asignatura) => asignatura.linea_plan_id === linea.id,
+        ),
+    )
+  }, [lineasApi, data, esPlanAreaComun, areaComun, asignaturaApi, lineaComunId])
   const [draggedAsignatura, setDraggedAsignatura] = useState<string | null>(
     null,
   )
@@ -614,13 +631,8 @@ function MapaCurricularPage() {
       setAsignaturas(mapAsignaturasToAsignaturas(asignaturaApi))
   }, [asignaturaApi])
 
-  useEffect(() => {
-    if (lineasApi) setLineas(mapLineasToLineaCurricular(lineasApi))
-  }, [lineasApi])
-
   const ciclosTotales = Number(totalCiclos)
   const ciclosArray = Array.from({ length: ciclosTotales }, (_, i) => i + 1)
-  const esPlanAreaComun = data?.categoria === 'AREA_COMUN'
   const distribucionComun =
     (esPlanAreaComun && areaComun?.borrador ? null : areaComun?.distribucion) ??
     (areaComun?.borrador ?? areaComun?.contenido?.distribuciones)?.find(
@@ -1823,17 +1835,16 @@ function MapaCurricularPage() {
     return totales
   })()
 
-  const generateExcel = async () => {
+  const { mutateAsync: prepararExcel, isPending: preparandoExcel } =
+    useExportarMapaExcel()
+
+  const descargarExcel = async () => {
     try {
-      const formato = 'xlsx'
-      const blob = await fetchPlanExcel({
-        plan_estudio_id: planId,
-        convertTo: formato,
-      })
+      const blob = await prepararExcel(planId)
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `${data ? getPlanDisplayName(data) : 'plan'}.${formato}`
+      link.download = `${data ? getPlanDisplayName(data) : 'plan'}.xlsx`
       document.body.appendChild(link)
       link.click()
 
@@ -2160,11 +2171,13 @@ function MapaCurricularPage() {
           <TooltipTrigger asChild>
             <Button
               variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              aria-label="Exportar a Excel"
-              onClick={() => generateExcel()}
+              size={preparandoExcel ? 'default' : 'icon'}
+              aria-label={
+                preparandoExcel ? 'Preparando Excel' : 'Exportar a Excel'
+              }
+              onClick={descargarExcel}
               disabled={
+                preparandoExcel ||
                 asignaturas.length === 0 ||
                 lineas.length === 0 ||
                 asignaturas.every(
@@ -2172,11 +2185,21 @@ function MapaCurricularPage() {
                 )
               }
             >
-              <Download className="h-4 w-4" />
+              {preparandoExcel ? (
+                <>
+                  <Loader2 className="size-4 motion-safe:animate-spin" />
+                  Preparando Excel…
+                </>
+              ) : (
+                <Download className="size-4" />
+              )}
             </Button>
           </TooltipTrigger>
           <TooltipContent>Exportar a Excel</TooltipContent>
         </Tooltip>
+        <span className="sr-only" role="status">
+          {preparandoExcel ? 'Preparando Excel' : ''}
+        </span>
       </BarraVistaCurricular>
 
       {data?.categoria === 'AREA_COMUN' && (

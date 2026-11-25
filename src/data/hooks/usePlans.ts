@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
+import { fetchPlanExcel } from '../api/document.api'
 import {
   ai_generate_plan,
   plan_registro_oficial_upsert,
@@ -616,6 +617,15 @@ export function useDeletePlanEstudio() {
       invalidateOnSettle: () => [qk.registrosOficiales()],
       errorMessage: 'No se pudo eliminar el plan.',
     }),
+  })
+}
+
+export function useExportarMapaExcel() {
+  return useMutation({
+    mutationFn: (planId: UUID) =>
+      fetchPlanExcel({ plan_estudio_id: planId, convertTo: 'xlsx' }),
+    networkMode: 'always',
+    meta: { errorMessage: false },
   })
 }
 
