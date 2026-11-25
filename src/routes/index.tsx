@@ -209,8 +209,27 @@ function InicioPage() {
       .join(' · ')
   }
 
-  if (isLoading || !contexto) {
+  if (isLoading) {
     return <InicioSkeleton />
+  }
+
+  if (!contexto) {
+    return (
+      <main className="px-seccion mx-auto flex min-h-[70vh] max-w-5xl items-center">
+        <div className="border-border gap-grupo py-region flex w-full items-start border-y">
+          <CircleAlert
+            aria-hidden="true"
+            className="text-muted-foreground mt-micro size-6 shrink-0"
+          />
+          <div>
+            <h1 className="text-xl font-semibold">Sin rol asignado</h1>
+            <p className="text-muted-foreground mt-micro text-sm">
+              Contacta al administrador para que asigne un rol a tu cuenta.
+            </p>
+          </div>
+        </div>
+      </main>
+    )
   }
 
   if (

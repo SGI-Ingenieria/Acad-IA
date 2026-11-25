@@ -18,3 +18,4 @@ api/__queuestorage__
 .playwright/
 playwright-report/
 test-results/
+supabase/config.toml

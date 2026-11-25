@@ -2,10 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { throwIfError } from '../api/_helpers'
-import {
-  getSessionAppMetadata,
-  getSessionEffectiveAuthz,
-} from '../auth/permissions'
+import { getSessionAppMetadata } from '../auth/permissions'
 import { qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
@@ -32,10 +29,8 @@ function startupRefreshNeeded(session: Session): boolean {
   const expiresAt = session.expires_at ?? 0
   if (expiresAt - nowSeconds <= 60) return true
 
-  const authz = getSessionEffectiveAuthz(session)
-  return (
-    !authz.isAdmin && authz.roleKeys.size === 0 && authz.permissions.size === 0
-  )
+  const { roles_claves, permisos } = getSessionAppMetadata(session)
+  return !Array.isArray(roles_claves) || !Array.isArray(permisos)
 }
 
 function invalidateAuthQueries(qc: QueryClient) {
