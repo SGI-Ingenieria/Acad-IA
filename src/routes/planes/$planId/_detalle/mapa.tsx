@@ -478,7 +478,8 @@ function MapaCurricularPage() {
     return lineasPlan.filter(
       (linea) =>
         linea.id === lineaComunId ||
-        (linea.nombre !== '2. Área curricular común' &&
+        (linea.nombre !== 'Área curricular común' &&
+          linea.nombre !== '2. Área curricular común' &&
           linea.nombre !== 'Área curricular común básica') ||
         asignaturaApi.some(
           (asignatura) => asignatura.linea_plan_id === linea.id,

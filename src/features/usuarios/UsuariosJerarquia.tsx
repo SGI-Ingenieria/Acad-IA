@@ -94,7 +94,11 @@ const VICERRECTOR_ROLE_KEY = 'VICERRECTOR_ACADEMICO'
 
 type RoleScope = Rol['alcance_default']
 type NodeVariant =
-  'global' | 'vicerrectoria' | 'faculty' | 'career' | 'external'
+  | 'global'
+  | 'vicerrectoria'
+  | 'faculty'
+  | 'career'
+  | 'external'
 
 type GlobalRoleKey = typeof ADMIN_ROLE_KEY | typeof VICERRECTOR_ROLE_KEY
 
@@ -1167,7 +1171,12 @@ function PersonNode({
   usuario: Usuario
   materias?: number
   variant:
-    'global' | 'vicerrectoria' | 'faculty' | 'head' | 'professor' | 'external'
+    | 'global'
+    | 'vicerrectoria'
+    | 'faculty'
+    | 'head'
+    | 'professor'
+    | 'external'
   selected: boolean
   inSelectedPath: boolean
   matched: boolean
@@ -2388,7 +2397,7 @@ function buildHierarchyViewModel(
       nodeId,
       usuario: miembro.usuario,
       roleLabel: 'Área común',
-      scopeLabel: '2. Área curricular común',
+      scopeLabel: 'Área curricular común',
       scope: 'area_comun',
       pathIds: [nodeId],
       pathLabel: [

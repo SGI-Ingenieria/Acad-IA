@@ -10,7 +10,7 @@ select is((select sum(asignaturas_referencia)::int from public.area_comun_bloque
 select is((select sum(horas_referencia)::int from public.area_comun_bloques),576,
   'el total de horas de referencia es el agregado ACC');
 select is((select nombre_display from public.planes_estudio where categoria='AREA_COMUN' limit 1),
-  '2. Área curricular común','el plan institucional usa el nombre ordinal acordado');
+  'Área curricular común','el plan institucional usa el nombre visible acordado');
 select is((select alcance_default from public.roles where clave='ENCARGADO_BLOQUE'),
   'area_comun_bloque','el rol usa alcance por bloque');
 select ok(has_table_privilege(
