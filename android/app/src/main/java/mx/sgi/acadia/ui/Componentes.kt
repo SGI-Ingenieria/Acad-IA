@@ -1,0 +1,433 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package mx.sgi.acadia.ui
+
+import android.text.Html
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import mx.sgi.acadia.data.*
+
+@Composable
+fun BarrasDialogoAcad() {
+    val vista = LocalView.current
+    val ventana = (vista.parent as? DialogWindowProvider)?.window
+    val claras = MaterialTheme.colorScheme.background.luminance() > .5f
+    SideEffect {
+        ventana?.let {
+            WindowCompat.getInsetsController(it, vista).apply {
+                isAppearanceLightStatusBars = claras
+                isAppearanceLightNavigationBars = claras
+            }
+        }
+    }
+}
+
+@Composable
+fun AccionIcono(nombre: String, icono: ImageVector, enabled: Boolean = true, accion: () -> Unit) {
+    TooltipBox(
+        positionProvider =
+            TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text(nombre) } },
+        state = rememberTooltipState(),
+    ) {
+        IconButton(onClick = accion, enabled = enabled) { Icon(icono, contentDescription = nombre) }
+    }
+}
+
+@Composable
+fun Pagina(
+    titulo: String,
+    atras: (() -> Unit)? = null,
+    acciones: @Composable RowScope.() -> Unit = {},
+    mostrarBarra: Boolean = true,
+    mensaje: String? = null,
+    consumirMensaje: () -> Unit = {},
+    accionFlotante: @Composable () -> Unit = {},
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    val avisos = remember { SnackbarHostState() }
+    val consumirActual by rememberUpdatedState(consumirMensaje)
+    LaunchedEffect(mensaje) {
+        if (mensaje != null) {
+            avisos.showSnackbar(
+                message = mensaje,
+                withDismissAction = true,
+                duration =
+                    if (mensaje == "Cambios guardados") SnackbarDuration.Short
+                    else SnackbarDuration.Long,
+            )
+            consumirActual()
+        }
+    }
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = accionFlotante,
+        snackbarHost = {
+            SnackbarHost(avisos) { aviso ->
+                Snackbar(
+                    dismissAction = {
+                        IconButton(onClick = aviso::dismiss) {
+                            Icon(Icons.Outlined.Close, "Cerrar aviso")
+                        }
+                    }
+                ) {
+                    Text(aviso.visuals.message)
+                }
+            }
+        },
+        topBar = {
+            if (mostrarBarra)
+                TopAppBar(
+                    title = { Text(titulo, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    navigationIcon = {
+                        if (atras != null)
+                            AccionIcono(
+                                "Volver",
+                                Icons.AutoMirrored.Outlined.ArrowBack,
+                                accion = atras,
+                            )
+                    },
+                    actions = acciones,
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        ),
+                )
+        },
+        content = content,
+    )
+}
+
+@Composable
+fun Encabezado(titulo: String, etiqueta: String? = null, accion: (@Composable () -> Unit)? = null) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            if (etiqueta != null)
+                Text(
+                    etiqueta.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            Text(
+                titulo,
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        accion?.invoke()
+    }
+}
+
+@Composable
+fun EtiquetaEstado(texto: String) {
+    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(50)) {
+        Text(
+            texto.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+            Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    }
+}
+
+@Composable
+fun Dato(valor: String, etiqueta: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(valor, style = MaterialTheme.typography.headlineSmall)
+        Text(
+            etiqueta,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+fun Aviso(texto: String, error: Boolean = true, reintentar: (() -> Unit)? = null) {
+    Surface(
+        color =
+            if (error) MaterialTheme.colorScheme.errorContainer
+            else MaterialTheme.colorScheme.secondaryContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                texto,
+                style = MaterialTheme.typography.bodyMedium,
+                color =
+                    if (error) MaterialTheme.colorScheme.onErrorContainer
+                    else MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            if (reintentar != null) TextButton(onClick = reintentar) { Text("Reintentar") }
+        }
+    }
+}
+
+@Composable
+fun Vacio(
+    titulo: String,
+    icono: ImageVector = Icons.Outlined.AutoStories,
+    accion: (@Composable () -> Unit)? = null,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icono, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+        Text(titulo, style = MaterialTheme.typography.titleLarge)
+        accion?.invoke()
+    }
+}
+
+@Composable
+fun Esqueleto() {
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+        repeat(4) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().height(if (it == 0) 110.dp else 72.dp),
+            ) {}
+        }
+    }
+}
+
+@Composable
+fun <T> Carga(estado: EstadoCarga<T>, reintentar: () -> Unit, content: @Composable (T) -> Unit) {
+    // Navigation gives each destination its own LifecycleOwner. Returning to a saved
+    // destination and resuming the app both reconcile its data without clearing it.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { reintentar() }
+    Column {
+        if (estado.cargando && estado.datos != null)
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (estado.error != null)
+            Box(Modifier.padding(16.dp)) { Aviso(estado.error, reintentar = reintentar) }
+        when {
+            estado.datos != null -> content(estado.datos)
+            estado.cargando -> Esqueleto()
+        }
+    }
+}
+
+@Composable
+fun FilaPlan(plan: Registro, abrir: () -> Unit) {
+    val carrera = plan.objeto("carreras")
+    val estado = plan.objeto("estados_plan").texto("etiqueta", "Borrador")
+    val acceso = !plan.containsKey("puede_abrir_detalle") || plan.booleano("puede_abrir_detalle")
+    Column(
+        Modifier.fillMaxWidth()
+            .clickable(enabled = acceso, onClick = abrir)
+            .padding(vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FacultadIdentidad(carrera.objeto("facultades"), Modifier.weight(1f))
+            Icon(
+                Icons.Outlined.ChevronRight,
+                "Abrir plan",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(plan.nombre, style = MaterialTheme.typography.titleLarge)
+        Text(
+            "${plan.numero("numero_ciclos")} ${plan.texto("tipo_ciclo", "ciclo").lowercase()}s · ${carrera.texto("nivel")}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        EtiquetaEstado(estado)
+        if (!acceso)
+            Text(
+                "Solo metadatos · Sin acceso al expediente",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+}
+
+@Composable
+fun FilaAsignatura(asignatura: Registro, abrir: () -> Unit) {
+    val plan = nombrePlanAsignatura(asignatura)
+    val facultad =
+        objeto(
+            "nombre" to asignatura.texto("facultad_nombre"),
+            "nombre_corto" to asignatura.texto("facultad_nombre_corto"),
+            "prefijo" to asignatura.texto("facultad_prefijo"),
+            "icono" to asignatura.texto("facultad_icono"),
+            "color" to asignatura.texto("facultad_color"),
+        )
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable(role = Role.Button, onClickLabel = "Abrir asignatura", onClick = abrir)
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(asignatura.nombre, style = MaterialTheme.typography.titleMedium)
+            if (plan.isNotBlank())
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (asignatura.texto("facultad_nombre").isNotBlank())
+                        Icon(
+                            iconoFacultad(facultad.texto("icono")),
+                            nombreFacultad(facultad),
+                            Modifier.padding(top = 1.dp).size(18.dp),
+                            tint = colorFacultad(facultad),
+                        )
+                    Text(
+                        plan,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            Text(
+                listOf(
+                        asignatura.texto("codigo"),
+                        etiquetaCreditosAsignatura(asignatura),
+                        etiquetaCicloAsignatura(asignatura),
+                    )
+                    .filter { it.isNotBlank() }
+                    .joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            Icons.Outlined.ChevronRight,
+            null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+}
+
+fun textoPlano(html: String): String =
+    Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT).toString().trim()
+
+fun etiquetaCampo(clave: String) = clave.replace('_', ' ').replaceFirstChar { it.uppercase() }
+
+@Composable
+fun TextoAcademico(titulo: String, texto: String, editar: (() -> Unit)? = null) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                titulo,
+                Modifier.weight(1f).semantics { heading() },
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (editar != null) AccionIcono("Editar $titulo", Icons.Outlined.Edit, accion = editar)
+        }
+        if (textoPlano(texto).isBlank())
+            Text("Pendiente", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else ContenidoEnriquecido(texto)
+    }
+}
+
+@Composable
+fun DialogoFormulario(
+    titulo: String,
+    guardando: Boolean,
+    error: String?,
+    cerrar: () -> Unit,
+    guardar: () -> Unit,
+    valido: Boolean = true,
+    etiquetaGuardar: String = "Guardar",
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = { if (!guardando) cerrar() }) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface) {
+            Column(
+                Modifier.padding(24.dp).heightIn(max = 680.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(titulo, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                    AccionIcono("Cerrar", Icons.Outlined.Close, !guardando, cerrar)
+                }
+                Column(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    content = content,
+                )
+                if (error != null)
+                    Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                Button(
+                    onClick = guardar,
+                    enabled = valido && !guardando,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (guardando)
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Outlined.Check, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (guardando) "Guardando…" else etiquetaGuardar)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun Selector(
+    etiqueta: String,
+    valor: String,
+    opciones: List<Pair<String, String>>,
+    seleccionar: (String) -> Unit,
+) {
+    var abierto by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = abierto, onExpandedChange = { abierto = it }) {
+        OutlinedTextField(
+            value = opciones.firstOrNull { it.first == valor }?.second.orEmpty(),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(etiqueta) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(abierto) },
+            modifier =
+                Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
+            opciones.forEach { (id, nombre) ->
+                DropdownMenuItem(
+                    text = { Text(nombre) },
+                    onClick = {
+                        seleccionar(id)
+                        abierto = false
+                    },
+                )
+            }
+        }
+    }
+}
