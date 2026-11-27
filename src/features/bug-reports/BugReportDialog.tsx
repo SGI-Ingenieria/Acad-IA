@@ -5,6 +5,7 @@ import {
   ExternalLink,
   ImagePlus,
   LoaderCircle,
+  Maximize2,
   Paperclip,
   RefreshCw,
   Trash2,
@@ -27,6 +28,11 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   BUG_REPORT_MAX_ATTACHMENTS,
   createBugReport,
@@ -92,6 +98,8 @@ export function BugReportDialog({ open, onOpenChange }: BugReportDialogProps) {
   const [success, setSuccess] = useState<{ url: string; title: string } | null>(
     null,
   )
+  const [previewAttachment, setPreviewAttachment] =
+    useState<LocalAttachment | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const startedCaptureAttemptRef = useRef<number | null>(null)
   const url = typeof window === 'undefined' ? '' : window.location.href
@@ -156,6 +164,7 @@ export function BugReportDialog({ open, onOpenChange }: BugReportDialogProps) {
     setAttachments([])
     setCaptureState('idle')
     setSuccess(null)
+    setPreviewAttachment(null)
     setCaptureAttempt(0)
     startedCaptureAttemptRef.current = null
   }
@@ -210,6 +219,9 @@ export function BugReportDialog({ open, onOpenChange }: BugReportDialogProps) {
   function removeAttachment(index: number) {
     const attachment = attachments.at(index)
     if (!attachment) return
+    if (previewAttachment?.previewUrl === attachment.previewUrl) {
+      setPreviewAttachment(null)
+    }
     URL.revokeObjectURL(attachment.previewUrl)
     setAttachments((current) =>
       current.filter((_, itemIndex) => itemIndex !== index),
@@ -220,6 +232,7 @@ export function BugReportDialog({ open, onOpenChange }: BugReportDialogProps) {
     attachments.forEach((attachment) =>
       URL.revokeObjectURL(attachment.previewUrl),
     )
+    setPreviewAttachment(null)
     setAttachments([])
   }
 
@@ -346,11 +359,28 @@ export function BugReportDialog({ open, onOpenChange }: BugReportDialogProps) {
                         className="border-border bg-background gap-control p-relacionado flex items-center rounded-md border"
                       >
                         {attachment.mime.startsWith('image/') ? (
-                          <img
-                            src={attachment.previewUrl}
-                            alt="Vista previa del reporte"
-                            className="size-16 rounded object-cover"
-                          />
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="group focus-visible:ring-ring relative size-16 shrink-0 overflow-hidden rounded focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                                aria-label={`Ampliar vista previa de ${attachment.name}`}
+                                onClick={() => setPreviewAttachment(attachment)}
+                              >
+                                <img
+                                  src={attachment.previewUrl}
+                                  alt={`Vista previa de ${attachment.name}`}
+                                  className="size-full object-cover transition-transform group-hover:scale-105"
+                                />
+                                <span className="bg-foreground/60 text-background absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                                  <Maximize2 className="size-4" />
+                                </span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Ampliar vista previa
+                            </TooltipContent>
+                          </Tooltip>
                         ) : (
                           <Paperclip className="text-muted-foreground size-5" />
                         )}
@@ -391,6 +421,31 @@ export function BugReportDialog({ open, onOpenChange }: BugReportDialogProps) {
                   }}
                 />
               </div>
+
+              <Dialog
+                open={previewAttachment !== null}
+                onOpenChange={(isOpen) => {
+                  if (!isOpen) setPreviewAttachment(null)
+                }}
+              >
+                <DialogContent className="sm:max-w-4xl">
+                  <DialogHeader>
+                    <DialogTitle>Vista previa de la evidencia</DialogTitle>
+                    <DialogDescription>
+                      {previewAttachment?.name}
+                    </DialogDescription>
+                  </DialogHeader>
+                  {previewAttachment ? (
+                    <div className="bg-muted/30 p-control flex max-h-[70vh] items-center justify-center overflow-auto rounded-md">
+                      <img
+                        src={previewAttachment.previewUrl}
+                        alt={`Vista previa ampliada de ${previewAttachment.name}`}
+                        className="max-h-[65vh] max-w-full object-contain"
+                      />
+                    </div>
+                  ) : null}
+                </DialogContent>
+              </Dialog>
 
               <div className="text-muted-foreground flex items-center justify-between text-xs">
                 <span>
